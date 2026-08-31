@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.careerops.v431-post-reboot-validation</string>
+  <key>ProgramArguments</key><array>
+    <string>/opt/homebrew/bin/node</string>
+    <string>/Users/jorgeaveraf/Documents/Personal/career-ops/career-ops/operations/v431-post-reboot-validation.mjs</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/jorgeaveraf/Documents/Personal/career-ops/career-ops</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>CAREER_OPS_V431_PRE_REBOOT_BOOT_EPOCH</key><string>1788098547</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><false/>
+  <key>ProcessType</key><string>Background</string>
+  <key>ThrottleInterval</key><integer>60</integer>
+  <key>Umask</key><integer>63</integer>
+  <key>StandardOutPath</key><string>/Users/jorgeaveraf/Documents/Personal/career-ops/career-ops/logs/health/v431-post-reboot.stdout.log</string>
+  <key>StandardErrorPath</key><string>/Users/jorgeaveraf/Documents/Personal/career-ops/career-ops/logs/health/v431-post-reboot.stderr.log</string>
+</dict></plist>

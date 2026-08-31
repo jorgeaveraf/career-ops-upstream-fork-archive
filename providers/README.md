@@ -6,7 +6,8 @@ Job-source provider modules for the zero-token portal scanner (`scan.mjs`).
 
 Each non-helper `*.mjs` file in this directory maps one public, no-auth job
 source (ATS API, RSS/XML feed, or server-rendered HTML page) to the scanner's
-normalized `Job` shape. Providers are zero-token by design: they hit public
+normalized `Job` shape. The acquisition adapter then validates and enriches
+those jobs; see [docs/ACQUISITION.md](../docs/ACQUISITION.md). Providers are zero-token by design: they hit public
 endpoints directly, with no LLM calls and no login. The user-facing catalog of
 supported sources lives in
 [docs/SUPPORTED_JOB_BOARDS.md](../docs/SUPPORTED_JOB_BOARDS.md).
@@ -37,6 +38,10 @@ export default {
   board-wide feeds.
 - `fetch(entry, ctx)` (required) — resolve the source and return an array of
   `Job` objects.
+- `version` (recommended) — adapter version when the provider has begun
+  explicit versioning. The loader supplies `acquire()`, which wraps `fetch()`
+  in the common `AcquisitionResult` contract; providers do not implement
+  persistence.
 
 ### Job shape (see `_types.js` for the full typedef)
 
@@ -46,6 +51,9 @@ export default {
 - `description` — optional; populate ONLY when the list payload carries it
   for free (no extra per-job request — the scanner is zero-token).
 - `postedAt` — optional epoch ms; omit when the source has no usable date.
+- `externalId`, `canonicalUrl`, `providerVersion` — preserve these whenever
+  the source exposes them. The adapter supplies deterministic canonical URL,
+  content hash, provenance, and field evidence.
 
 ### Context (`ctx`)
 

@@ -1,0 +1,28 @@
+import { existsSync, unlinkSync } from 'fs';
+import { execFileSync } from 'child_process';
+import os from 'os';
+import path from 'path';
+import { randomUUID } from 'crypto';
+import { assertAllowedRecoveryAction } from './policy.mjs';
+import { WorkflowCommandWorker, pushCommandStatus } from '../operations/command-worker.mjs';
+import { drainActionableNotifications } from '../notifications/runtime.mjs';
+import { createGoogleOAuthTokenProviderFromEnv } from '../operations/google-oauth.mjs';
+import { GoogleSheetsApiAdapter } from '../human-control-plane/sheets-adapter.mjs';
+import { WorkerOrchestrator } from '../execution-orchestration/worker-registry.mjs';
+
+export class OperationalRecoveryActions {
+  constructor({registry,env=process.env,exec=execFileSync,fetchImpl=globalThis.fetch,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),processAlive=pid=>{try{process.kill(pid,0);return true;}catch{return false;}},workerFactory=r=>new WorkflowCommandWorker({registry:r})}={}){this.registry=registry;this.db=registry.db;this.env=env;this.exec=exec;this.fetch=fetchImpl;this.sleep=sleep;this.processAlive=processAlive;this.workerFactory=workerFactory;}
+  async execute(action,signal){assertAllowedRecoveryAction(action);switch(action){
+    case'RESTART_COMMAND_SUBSCRIBER':case'RESTART_LAUNCHAGENT':{const label=signal.aggregateId,domain=`gui/${process.getuid()}`,plist=path.join(os.homedir(),'Library','LaunchAgents',`${label}.plist`);try{this.exec('/bin/launchctl',['kickstart','-k',`${domain}/${label}`],{encoding:'utf8'});}catch{if(!existsSync(plist))throw Object.assign(new Error(`canonical plist missing: ${plist}`),{code:'PLIST_MISSING'});try{this.exec('/bin/launchctl',['bootout',`${domain}/${label}`],{encoding:'utf8'});}catch{}this.exec('/bin/launchctl',['bootstrap',domain,plist],{encoding:'utf8'});}let output='';try{output=this.exec('/bin/launchctl',['print',`${domain}/${label}`],{encoding:'utf8'});}catch{}return{success:/\bstate = running\b/.test(output)||/\bpid = \d+\b/.test(output),verification:{label,loaded:Boolean(output)}};}
+    case'CLEAR_STALE_BROWSER_LOCK':{const lockPath=signal.evidenceRefs.find(x=>x.type==='lockPath')?.id;if(!lockPath||!existsSync(lockPath))return{success:true,verification:{alreadyAbsent:true}};const owner=JSON.parse(await import('fs').then(m=>m.readFileSync(lockPath,'utf8')));if(this.processAlive(Number(owner.pid)))throw Object.assign(new Error('browser lock owner is alive'),{code:'LOCK_OWNER_ALIVE'});unlinkSync(lockPath);return{success:!existsSync(lockPath),verification:{removed:true}};}
+    case'RECOVER_ORPHANED_COMMAND':{const result=await this.workerFactory(this.registry).process(signal.aggregateId);return{success:['SUCCESS','NEEDS_HUMAN','IGNORED_DUPLICATE'].includes(result.status),verification:{status:result.status}};}
+    case'RECOVER_ORPHANED_RUN':{const row=this.db.prepare('SELECT status FROM operational_runs WHERE id=?').get(signal.aggregateId);if(row?.status==='RUNNING')this.registry.finishOperationalRun(signal.aggregateId,{status:'FAILED',errors:[{code:'RECOVERED_ORPHANED_RUN'}]});return{success:this.registry.getOperationalRun(signal.aggregateId)?.status!=='RUNNING',verification:{status:this.registry.getOperationalRun(signal.aggregateId)?.status}};}
+    case'REQUEUE_SAFE_ENRICHMENT':{const count=this.registry.recoverExpiredEnrichmentClaims({at:this.registry.now()});return{success:count>0,verification:{requeued:count}};}
+    case'WAKE_EXECUTION_WORKER':{const result=new WorkerOrchestrator({registry:this.registry,exec:this.exec}).wake(signal.aggregateId,{reason:'STALE_QUEUE_RECOVERY'});return{success:['WAKE_STARTED','ALREADY_RUNNING','NO_WORK'].includes(result.result),verification:result};}
+    case'RETRY_GOOGLE_AUTH':{const delays=String(this.env.CAREER_OPS_AUTH_RETRY_DELAYS_MS||'10000,30000').split(',').map(Number).filter(Number.isFinite),provider=String(this.env.GOOGLE_SHEETS_AUTH_MODE||'unknown');let lastCode='WORKSPACE_AUTH_FAILED';for(let attempt=0;attempt<=delays.length;attempt++){if(attempt)await this.sleep(delays[attempt-1]);try{const token=createGoogleOAuthTokenProviderFromEnv({env:this.env,fetchImpl:this.fetch});await token.getAccessToken({forceRefresh:true});if(this.env.CAREER_OPS_SHEET_ID){const adapter=new GoogleSheetsApiAdapter({spreadsheetId:this.env.CAREER_OPS_SHEET_ID,tokenProvider:token,fetchImpl:this.fetch});await adapter.request(`${adapter.base}?fields=spreadsheetId`);}return{success:true,verification:{provider,attempt:attempt+1,sheetsVerified:Boolean(this.env.CAREER_OPS_SHEET_ID)}};}catch(error){lastCode=error.code||'WORKSPACE_AUTH_FAILED';}}return{success:false,verification:{provider,attempts:delays.length+1,errorCode:lastCode}};}
+    case'RETRY_SHEET_SYNC':{const result=await pushCommandStatus({registry:this.registry,spreadsheetId:this.env.CAREER_OPS_SHEET_ID});return{success:true,verification:{syncId:result.id}};}
+    case'DRAIN_NOTIFICATION_OUTBOX':{const result=await drainActionableNotifications({registry:this.registry,env:this.env});return{success:!result.results?.some(x=>['FAILED','AMBIGUOUS'].includes(x.status)),verification:{processed:result.processed,status:result.status}};}
+    case'TEMPORARILY_DEGRADE_SOURCE':{this.db.prepare("INSERT OR IGNORE INTO operational_source_degradations(degradation_id,signal_id,source,run_id,reason,started_at,expires_at) VALUES(?,?,?,?,?,?,datetime(?,'+1 day'))").run(randomUUID(),signal.signalId,signal.aggregateId,null,signal.signalType,this.registry.now(),this.registry.now());return{success:true,verification:{source:signal.aggregateId,temporary:true}};}
+    default:throw Object.assign(new Error(`unimplemented recovery action: ${action}`),{code:'POLICY_BLOCKED'});
+  }}
+}

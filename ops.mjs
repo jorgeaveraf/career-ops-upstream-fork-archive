@@ -1,0 +1,6 @@
+import 'dotenv/config';
+import { openJobRegistry } from './registry/job-registry.mjs';
+import { OperationalIntelligenceService } from './operational-intelligence/service.mjs';
+
+async function main(){const command=process.argv[2]||'status',json=process.argv.includes('--json'),registry=openJobRegistry();try{const service=new OperationalIntelligenceService({registry});let result;if(command==='scan')result=await service.scan({recover:!process.argv.includes('--no-recover')});else if(command==='recover'){const signalId=process.argv[3];if(!signalId||signalId.startsWith('--'))throw Object.assign(new Error('recover requires a signal id'),{code:'SIGNAL_ID_REQUIRED'});result=await service.recoverSignal(signalId);}else if(command==='signals')result=service.getOpenSignals();else if(command==='recoveries')result=service.getRecentRecoveries();else if(command==='status')result=service.getSystemSummary();else throw new Error(`unknown ops command: ${command}`);console.log(json||typeof result!=='string'?JSON.stringify(result,null,2):result);}finally{registry.close();}}
+main().catch(error=>{console.error(JSON.stringify({status:'FAILED',errorCode:error.code||'OPS_FAILED',error:error.message}));process.exitCode=1;});

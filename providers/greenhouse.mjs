@@ -117,6 +117,7 @@ export function buildOfficeMap(json) {
 /** @type {Provider} */
 export default {
   id: 'greenhouse',
+  version: '1',
 
   detect(entry) {
     try {
@@ -134,7 +135,8 @@ export default {
     // redirect:'error' prevents SSRF via server-side redirects; combined with
     // assertGreenhouseUrl above it guarantees the final hostname stays in the allowlist.
     const json = /** @type {any} */ (await ctx.fetchJson(apiUrl, { redirect: 'error' }));
-    const jobs = Array.isArray(json?.jobs) ? json.jobs : [];
+    if (!Array.isArray(json?.jobs)) throw new Error('greenhouse: unexpected API response — expected { jobs: [...] }');
+    const jobs = json.jobs;
     const usable = jobs.filter(/** @param {any} j */ j => j.absolute_url);
 
     // Only pay for /offices when this board actually hides its cities there.
@@ -170,6 +172,7 @@ export default {
       return {
         title: j.title || '',
         url: j.absolute_url,
+        externalId: j.id == null ? undefined : String(j.id),
         company: entry.name,
         location,
         postedAt: toEpochMs(j.first_published),

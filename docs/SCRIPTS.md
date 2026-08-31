@@ -34,6 +34,18 @@ All scripts live in the project root as `.mjs` modules. Most are exposed via
 | `npm run find` | `find.mjs` | Resolve a report#/tracker#/company query to its full pipeline identity |
 | `npm run invite-match` | `invite-match.mjs` | Fuzzy-match a pasted interview-invite email against `data/applications.md` |
 | `npm run application:init` | `application-artifacts.mjs` | Initialize one versioned application-scoped JD/CV/PDF artifact bundle |
+| `npm run application-package` | `application-package.mjs` | Generate, inspect, and human-review evidence-backed structured application-package drafts |
+| `npm run application:enrich` | `application-enrich.mjs` | Inspect, dry-run, claim, process, or retry authorized NEXT_STAGE enrichment requests; never applies or contacts |
+| `npm run contact-intelligence` | `contact-intelligence.mjs` | Build and inspect evidence-backed company/person relationship research for ready packages |
+| `npm run control-plane` | `human-control-plane.mjs` | Preview, initialize, push, pull, or sync the Google Sheets human control plane |
+| `npm run daily:auto` | `daily-auto.mjs` | Run the scheduler-ready discovery-to-dashboard loop and notify only on actionable change |
+| `npm run health` | `health.mjs` | Inspect local runtime, SQLite, operations, sync, notification, disk, and configuration health |
+| `npm run backup` | `backup.mjs` | Create/validate private local SQLite snapshots with configurable retention |
+| `npm run launch-agent` | `launch-agent.mjs` | Generate, idempotently install, load, unload, or inspect the macOS LaunchAgent |
+| `npm run browser:research` | `browser-research.mjs` | Run read-only Research, manual Discovery with `--discover`, or the guarded 16:00 Discovery window with `--scheduled` |
+| `npm run browser:launch-agent` | `browser-launch-agent.mjs` | Generate or explicitly manage the uninstalled 16:00 Browser Discovery LaunchAgent |
+| `npm run application:launch-agent` | `application-enrichment-launch-agent.mjs` | Manage bounded 17:00 application enrichment; never schedules submission |
+| `npm run discovery:strategy` | `discovery-strategy.mjs` | Inspect the Candidate-KB-backed strategy, deterministic platform tasks, and per-task explanations without navigation |
 | `npm run paste-reply` | `paste-reply.mjs` | Manual/no-Gmail input into the `reply-watch.mjs` classification pipeline |
 | `npm run freshness` | `check-table-freshness.mjs` | Staleness validator for jurisdiction data tables (`as_of` / `next_effective` watchdog) |
 | `npm run openai:tailor` | `openai-tailor.mjs` | Tailor a CV via any OpenAI-compatible endpoint (headless companion to `openai-eval.mjs`) |
@@ -974,6 +986,19 @@ and `4` means the tracker lock timed out and the operation should be retried.
 
 ---
 
+## facebook.mjs
+
+Bounded Facebook community research. `discover-communities --dry-run` compiles Candidate-KB-backed queries without navigation or writes; live discovery stores scored groups in the Registry. `monitor` reads only groups whose human membership state is `JOINED_CONFIRMED` or `MONITORING`. It never joins, messages, reacts, comments, applies, submits, or uploads. See `docs/FACEBOOK_COMMUNITIES.md`.
+
+```bash
+npm run facebook -- discover-communities --dry-run --max-queries 5
+npm run facebook -- discover-communities --max-candidates 30
+npm run facebook -- communities
+npm run facebook -- monitor --group <community-id>
+```
+
+---
+
 ## stats.mjs
 
 Aggregates lifetime pipeline stats into one JSON report. Stats include tracker, scanner, portals, follow-ups and runs. Reads from data/applications.md, data/scan-history.tsv, portals.yml, data/follow-ups.md and data/scan-runs.tsv. If a file doesn't exist yet, the section turns into null.
@@ -1041,3 +1066,8 @@ Runs:       — no data (data/scan-runs.tsv missing; created by the next scan)
 * `filtered_blacklist` — skipped because the company is on your `data/blacklist.md` do-not-apply list (#1742)
 
 As the project is in continuous development, to parse for a stat we recommend doing it by column header instead of position.
+# V2 application execution and calibration
+
+- `npm run application:execute -- status` — inspect exact application authorizations without submitting.
+- `npm run application:execute -- execute --authorization <id>` — process one exact authorization; missing channel adapters stop as `NEEDS_HUMAN`.
+- `npm run feedback:calibrate` — rebuild bounded, explainable V2E calibration signals from lifecycle evidence.

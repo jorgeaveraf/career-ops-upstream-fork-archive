@@ -1,0 +1,8 @@
+ALTER TABLE application_execution_authorizations ADD COLUMN supersedes_authorization_id TEXT REFERENCES application_execution_authorizations(id) ON DELETE RESTRICT;
+ALTER TABLE application_execution_authorizations ADD COLUMN superseded_by_authorization_id TEXT REFERENCES application_execution_authorizations(id) ON DELETE RESTRICT;
+ALTER TABLE application_execution_authorizations ADD COLUMN supersession_reason TEXT;
+ALTER TABLE application_execution_authorizations ADD COLUMN superseded_at TEXT;
+
+CREATE UNIQUE INDEX idx_application_authorization_supersedes
+  ON application_execution_authorizations(supersedes_authorization_id)
+  WHERE supersedes_authorization_id IS NOT NULL;

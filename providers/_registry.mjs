@@ -10,6 +10,7 @@
 import { existsSync, readdirSync } from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';
+import { acquireProvider } from '../acquisition/provider-adapter.mjs';
 
 /**
  * Load every provider plugin in a directory into an id→provider Map.
@@ -45,7 +46,10 @@ export async function loadProviders(dir) {
       console.error(`⚠️  ${file}: duplicate provider id "${p.id}" — keeping first`);
       continue;
     }
-    providers.set(p.id, p);
+    providers.set(p.id, {
+      ...p,
+      acquire: (entry, context, options) => acquireProvider(p, entry, context, options),
+    });
   }
   return providers;
 }

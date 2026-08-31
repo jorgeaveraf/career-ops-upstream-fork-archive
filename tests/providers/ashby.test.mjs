@@ -193,17 +193,23 @@ try {
     pass('ashby.fetch() tolerates a sparse job (empty strings, null salary, undefined postedAt for a bad date)');
   else fail(`ashby.fetch() row 1 = ${JSON.stringify(fetched[1])}`);
 
-  // Malformed response bodies → [], no crash.
+  // Malformed response bodies are schema failures and are not retried.
   const emptyCases = [null, {}, { jobs: null }, { jobs: 'nope' }];
   let emptyOk = true;
   for (const body of emptyCases) {
-    const out = await ashby.fetch(
-      { name: 'Acme', careers_url: 'https://jobs.ashbyhq.com/acme' },
-      { fetchJson: async () => body },
-    );
-    if (!Array.isArray(out) || out.length !== 0) { emptyOk = false; fail(`ashby.fetch() body=${JSON.stringify(body)} → ${JSON.stringify(out)}`); break; }
+    let attempts = 0;
+    try {
+      await ashby.fetch(
+        { name: 'Acme', careers_url: 'https://jobs.ashbyhq.com/acme' },
+        { fetchJson: async () => { attempts++; return body; } },
+      );
+      emptyOk = false;
+    } catch (error) {
+      if (!/unexpected API response/.test(error.message) || attempts !== 1) emptyOk = false;
+    }
   }
-  if (emptyOk) pass('ashby.fetch() returns [] for null / {} / non-array jobs response bodies');
+  if (emptyOk) pass('ashby.fetch() rejects malformed jobs payloads immediately as schema changes');
+  else fail('ashby.fetch() should reject malformed response bodies without retry');
 
   // Retry loop — a transient failure on the first attempt recovers
   // transparently on the second (ASHBY_RETRIES=2 allows up to 3 attempts).

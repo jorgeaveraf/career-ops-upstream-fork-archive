@@ -8,8 +8,9 @@ These files contain your personal data, customizations, and work product. Update
 
 | File | Purpose |
 |------|---------|
+| `candidate/*` | Your structured Candidate Knowledge Base: identity, experience, projects, contextual skills, stories, explicit gaps, preferences pointers, evidence, and version metadata. Never auto-updated. |
 | `cv.md` | Your CV in markdown |
-| `config/profile.yml` | Your identity, targets, comp range |
+| `config/profile.yml` | Your identity, purpose-bound identity routing, targets, comp range |
 | `config/cv-facts.json` | Your CV fact-check allowlist and forbidden phrases |
 | `config/benchmarks.yml` | Your market calibration benchmark overrides (optional; copy `templates/benchmarks.yml` here and edit — read by `funnel-velocity.mjs`) |
 | `modes/_profile.md` | Your archetypes, narrative, negotiation scripts |
@@ -30,6 +31,11 @@ These files contain your personal data, customizations, and work product. Update
 | `data/pipeline.md` | Your URL inbox |
 | `data/scan-history.tsv` | Your scan history (tab-separated, append-only trailing columns; col 8: local SimHash JD fingerprint for cross-listing detection, col 9: posting date, cols 10-11: trust score/flags, col 12: normalized company key for repost/name matching). Older rows may have fewer columns — readers index by position and tolerate the absence. |
 | `data/scan-runs.tsv` | Your per-run scan counters (appended by `scan.mjs`, read by `stats.mjs`) |
+| `data/career.db` | Operational SQLite source of truth for acquisition, assessments, evaluations, packages, Contact Intelligence, sheet syncs, human actions, operational runs, and notification delivery state. Gitignored; Markdown trackers and Google Sheets remain compatibility/projection views. |
+| `logs/*` | Private local operational, browser-research, error, health, and launchd logs; generated and gitignored |
+| `config/browser-research.json` | Your local Browser Research source/task configuration; gitignored and seeded manually from `config/browser-research.example.json` |
+| `backups/*` | Private local SQLite snapshots and retention output; generated and gitignored |
+| `data/daily-run.lock` | Ephemeral local Daily Runner ownership record (PID, run ID, token, timestamps). Gitignored and removed after a clean run. |
 | `data/portal-health.tsv` | Consecutive reachability status for scanned portals (appended by `scan.mjs`; statuses: `reachable`, `empty`, `slug_gone`, `network`, `auth`, `server`, `unknown` — the last three joined the vocabulary later, so older files carry only the first four) |
 | `data/follow-ups.md` | Your follow-up history |
 | `data/active-interviews.md` | Your active interview processes, incl. inline `[process-friction]` notes (read by `process-quality.mjs`) |
@@ -117,6 +123,21 @@ These files contain system logic, scripts, templates, and instructions that impr
 | `AGENTS.md` | Canonical agent instructions (imported by CLI-specific wrappers) |
 | `*.mjs` | Utility scripts |
 | `providers/` | Job-source provider modules for the zero-token scanner |
+| `acquisition/` | Acquisition contracts, deterministic normalization, semantic content validation, provider adapters, and optional public PageReaders |
+| `intelligence/` | Deterministic eligibility, candidate-fit, opportunity-quality, and final-priority engines; reads canonical profile policy and never persists directly |
+| `candidate-knowledge/` | Read-only Candidate Knowledge Provider, schema validation, evidence retrieval, unknown handling, and deterministic hashing; contains no user facts |
+| `discovery-strategy.mjs`, `discovery-strategy/` | Candidate-KB-backed search strategy compiler, platform task generation, global rejection/compensation rules, explainability, and Facebook authenticity scoring; contains no candidate facts |
+| `deep-evaluation/` | Shortlist-only job analysis, evidence matching, optional structured reasoning, and post-generation validation; never persists directly |
+| `application-package/` | VALID-APPLY-only resume/cover/outreach/note draft generation and evidence validation; never persists or sends directly |
+| `contact-intelligence/` | Evidence-backed company/person normalization, conservative relationship classification, outreach strategy, and read-only package context; never persists or acts externally |
+| `human-control-plane.mjs`, `human-control-plane/` | Google Sheets projection contracts, Apps Script UX, and audited allowlisted import logic; SQLite remains authoritative |
+| `facebook.mjs`, `facebook/` | Read-only Facebook community discovery, deterministic scoring, human-only membership lifecycle, joined-group monitoring, post extraction, and Acquisition handoff; never joins or performs social/application actions |
+| `daily-auto.mjs`, `automation/` | Scheduler-ready daily orchestration, structured summaries, notification rules, and opt-in email provider abstraction |
+| `health.mjs`, `backup.mjs`, `launch-agent.mjs`, `browser-launch-agent.mjs`, `operations/` | Local health/startup validation, SQLite backup, logs, scheduled guards, and macOS LaunchAgent generation/control |
+| `browser-research.mjs`, `research/` | Read-only Browser Research plus manual/scheduled Browser Discovery providers, per-source tasks, quality metrics, Jorge-profile session/lock manager, Acquisition mapping, and Registry-bound runners; contains no credentials, cookies, sessions, or profile copy |
+| `config/browser-research.example.json` | System-owned Browser Research task/source template; contains URLs only, no user state |
+| `registry/` | Versioned SQLite schema migrations and the canonical Job Registry persistence boundary |
+| `runner/` | Daily orchestration, local locking, recovery, and structured summary logic |
 | `plugins/` | Bundled plugins + the plugin engine (opt-in external integrations) |
 | `plugins.mjs` | Plugin CLI (list/run/available/add/new/enable/skill/trust/remove) |
 | `plugins-registry/` | Curated community plugins, one `<id>.json` per plugin (the trust root) |

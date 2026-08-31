@@ -15,6 +15,7 @@ const FEED_URL = 'https://remoteok.com/api';
 /** @type {Provider} */
 export default {
   id: 'remoteok',
+  version: '1',
 
   /**
    * Fetches and normalizes postings from the RemoteOK public feed.
@@ -36,6 +37,7 @@ export default {
       .map(j => ({
         title: j.position.trim(),
         url: j.url.trim(),
+        ...(j.id != null || j.slug ? { externalId: String(j.id ?? j.slug) } : {}),
         company: typeof j.company === 'string' && j.company.trim() ? j.company.trim() : (entry.name || 'RemoteOK'),
         location: typeof j.location === 'string' ? j.location.trim() : '',
       }));

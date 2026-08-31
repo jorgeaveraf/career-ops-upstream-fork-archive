@@ -23,6 +23,32 @@ candidate:
   # Optional framing for the CV photo: rounded (default), circle, or square.
   photo_style: rounded
 
+# Optional but recommended: keep operational, browser, application-sender, and
+# platform-registration identities separate and route them by exact purpose.
+# identity_routing:
+#   version: 1
+#   source: USER_CONFIRMED
+#   confirmed_at: "2026-01-01T00:00:00Z"
+#   google_workspace_gcp:
+#     identity: "Workspace"
+#     principal: "user@workspace.example"
+#     purposes: [GOOGLE_SHEETS, GOOGLE_DRIVE_WORKSPACE, GCP, INFRASTRUCTURE_IAM, CAREER_OPS_CONTROL_PLANE, COMMAND_GATEWAY_GCP, PUBSUB_PUBLISH, PUBSUB_SUBSCRIBE]
+#   browser_job_search:
+#     chrome_profile: "Personal"
+#     purposes: [LINKEDIN, INDEED, OCC, FACEBOOK, ATS, COMPANY_CAREER_SITES, JOB_RESEARCH, APPLICATION_SUBMISSION, RECRUITER_PLATFORM_BROWSING]
+#   application_email:
+#     sender: "candidate@example.com"
+#     purposes: [APPLICATION_EMAIL_READ, CV_APPLICATION_EMAIL, JUSTIFIED_RECRUITER_HIRING_OUTREACH, APPLICATION_CORRESPONDENCE]
+#   system_notification:
+#     sender: "career@workspace.example"
+#     recipient: "candidate@example.com"
+#     purposes: [SYSTEM_NOTIFICATION_SEND]
+#   platform_signup:
+#     account_email: "signup@example.com"
+#     purposes: [REQUIRED_JOB_PLATFORM_ACCOUNT_CREATION]
+#     prohibited_uses: [APPLICATION_SENDER, CONTACT_SENDER]
+#     exception_policy: "EXPLICIT_USER_AUTHORIZATION_REQUIRED"
+
 target_roles:
   # Your North Star roles — what you're optimizing for
   primary:

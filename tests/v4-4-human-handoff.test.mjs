@@ -1,0 +1,27 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { openJobRegistry } from '../registry/job-registry.mjs';
+import { buildHumanHandoff, classifyAnswerPersistence, parseBundledAnswers } from '../application-execution/human-handoff.mjs';
+import { ManagedBrowserSession } from '../research/managed-browser-session.mjs';
+import { deriveHumanAttentionItems } from '../human-attention/service.mjs';
+import { renderActionableNotification } from '../notifications/templates.mjs';
+import { todayAttentionWeight } from '../human-control-plane/today-membership.mjs';
+
+const execution={id:'execution-44',jobId:'job-44',batchId:'batch-44',mutationState:'PRE_SUBMIT'};
+const session={windowId:41,tabId:42,markerUrl:'file:///dev/null#career-ops-test-session',currentUrl:'https://jobs.example/apply'};
+
+test('V4.4 schema installs the durable human handoff manager',()=>{const registry=openJobRegistry({dbPath:':memory:'});try{assert.equal(registry.getSchemaVersion(),35);assert.ok(registry.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='human_handoffs'").get());}finally{registry.close();}});
+
+test('CAPTCHA handoff delegates only the micro-action and keeps exact browser context',()=>{const value=buildHumanHandoff({execution,type:'CAPTCHA_REQUIRED',blocker:{url:session.currentUrl},session});assert.equal(value.action,'Solve CAPTCHA');assert.equal(value.progress,'WAITING ON CAPTCHA');assert.deepEqual(value.session,session);assert.equal(value.questions.length,0);});
+
+test('all unknown application facts are bundled into one handoff',()=>{const fields=[{label:'How many years of Python experience do you have?',name:'python_years'},{label:'What is your English level?',name:'english_level',options:[{label:'B2'},{label:'C1'}]}];const value=buildHumanHandoff({execution,type:'REAL_HUMAN_FACT_REQUIRED',fields,session});assert.equal(value.action,'Answer 2 application questions');assert.equal(value.questions.length,2);assert.equal(value.questions[1].allowedValues[1],'C1');});
+
+test('one bundled Sheet value validates every answer and rejects incomplete input',()=>{const handoff=buildHumanHandoff({execution,type:'REAL_HUMAN_FACT_REQUIRED',fields:[{label:'How many years of Python experience?',name:'python_years'},{label:'English level',name:'english_level'}],session});assert.equal(parseBundledAnswers('1. 8+ years\n2. C1',handoff.questions).ok,true);assert.equal(parseBundledAnswers('8+ years',handoff.questions).ok,false);});
+
+test('candidate knowledge persistence distinguishes reusable facts and job-specific compensation',()=>{assert.equal(classifyAnswerPersistence('How many years of Python experience?'),'REUSABLE_GLOBAL');assert.equal(classifyAnswerPersistence('Monthly compensation expectation'),'JOB_SPECIFIC');assert.equal(classifyAnswerPersistence('I certify this legal attestation'),'DO_NOT_PERSIST');});
+
+test('managed browser pause does not close the window and resume adopts the verified window',async()=>{const calls=[],lock={inspect:()=>({}),acquire:()=>({sessionId:'s1'}),update:(_s,value)=>calls.push(['update',value.state]),release:()=>calls.push(['unlock'])},driver={openWindow:async()=>({windowId:41,markerUrl:session.markerUrl}),closeWindow:async()=>calls.push(['close']),adoptWindow:async context=>(calls.push(['adopt',context.tabId]),context)};const manager=new ManagedBrowserSession({lockManager:lock,windowDriver:driver});const acquired=await manager.acquire({});acquired.window={markerUrl:session.markerUrl};await manager.pause(acquired);assert.equal(calls.some(item=>item[0]==='close'),false);const resumed=await manager.resume({},session);assert.equal(resumed.windowId,41);assert.equal(calls.some(item=>item[0]==='adopt'),true);});
+
+test('one active handoff becomes one human attention item with no manual takeover',()=>{const data={jobs:[{job:{id:'job-44',company:'ChainGPT',title:'Python Engineer'}}],applicationExecutions:[{...execution,status:'NEEDS_HUMAN',primaryChannel:'PLATFORM',blocker:{code:'CAPTCHA_REQUIRED'},updatedAt:'2026-08-30T12:00:00.000Z'}],humanHandoffs:[{id:'handoff-44',executionId:execution.id,jobId:execution.jobId,status:'ACTIVE',handoffType:'CAPTCHA_REQUIRED',action:'Solve CAPTCHA',instruction:'Solve only the CAPTCHA.',progress:'WAITING ON CAPTCHA',openUrl:session.currentUrl,questions:[],session,createdAt:'2026-08-30T12:00:00.000Z',updatedAt:'2026-08-30T12:00:00.000Z'}],humanState:[],workflowStatuses:[],enrichmentRequests:[],recentWorkflowEvents:[],applicationHumanAnswers:[],candidateSelection:{activeCandidates:[],snapshot:[],researchNeeds:[],top10:[]},communities:[]};const items=deriveHumanAttentionItems(data);assert.equal(items.length,1);assert.equal(items[0].recommendedAction,'Solve CAPTCHA');assert.equal(items[0].sessionResumable,true);assert.equal(items[0].priority,'CRITICAL');});
+
+test('quick CAPTCHA handoffs rank ahead of ordinary fact answers and digest hides technical codes',()=>{assert.ok(todayAttentionWeight({attentionType:'EXTERNAL_ACTION_REQUIRED',priority:'CRITICAL'})<todayAttentionWeight({attentionType:'ANSWER_REQUIRED',priority:'HIGH'}));const message=renderActionableNotification('APPLICATION_BATCH_DIGEST',{applied:[],blocked:[{company:'ChainGPT',action:'Solve CAPTCHA',instruction:'Solve only the CAPTCHA.',questionCount:0}],failed:[],outreach:{},todayPromoted:0});assert.match(message.subject,/acción breve/);assert.doesNotMatch(message.text,/CAPTCHA_REQUIRED|NEEDS_HUMAN|BLOCKED_EXTERNAL/);assert.match(message.text,/No completes aplicaciones manualmente/);});

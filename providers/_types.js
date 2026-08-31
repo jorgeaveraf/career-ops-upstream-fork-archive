@@ -18,6 +18,13 @@
  * @property {string} company  May be empty when the source can't expose it
  *                             at the list-page level; populated downstream.
  * @property {string} location May be empty.
+ * @property {string} [externalId] Provider-native job/requisition ID when the
+ *                               list payload exposes it. The registry can infer
+ *                               IDs from known ATS URL shapes as a fallback.
+ * @property {string} [canonicalUrl] Primary ATS/company URL when `url` is an
+ *                                  aggregator or discovery URL.
+ * @property {string} [providerVersion] Adapter version when independently
+ *                                     versioned; normally omitted for in-repo providers.
  * @property {string} [description] Job description text, populated ONLY when the
  *                               provider's list payload carries it for free (no
  *                               extra per-job request — the scanner is zero-token).
@@ -31,6 +38,10 @@
  *                               like scan-ats-full.mjs use it for recency
  *                               filtering.
  * @property {number} [trustScore] 0-100 trust score from _trust-validator.mjs.
+ * @property {string} [sourceUrl] Original public URL (added by the acquisition adapter).
+ * @property {object} [provenance] Required on jobs returned by provider.acquire().
+ * @property {Array<object>} [evidence] Field evidence returned by provider.acquire().
+ * @property {string} [contentHash] Deterministic normalized-description hash.
  * @property {string[]} [trustFlags] Flags raised by trust validation (e.g.
  *                                   'invalid_url', 'suspicious_domain').
  * @property {'high'|'medium'|'low'} [trustLevel] Classification derived from
@@ -115,8 +126,10 @@
  *
  * @typedef {object} Provider
  * @property {string} id                                                       Unique across all loaded providers.
+ * @property {string} [version]                                                Adapter version when explicitly versioned.
  * @property {((entry: PortalEntry) => (DetectHit | null))} [detect]           Optional auto-detection.
  * @property {(entry: PortalEntry, ctx: Context) => Promise<Job[]>} fetch      Required.
+ * @property {(entry: PortalEntry, ctx: Context, options?: object) => Promise<import('../acquisition/contracts.mjs').AcquisitionResult>} [acquire]
  */
 
 export {};

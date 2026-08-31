@@ -69,6 +69,7 @@ function toEpochMs(value) {
 /** @type {Provider} */
 export default {
   id: 'himalayas',
+  version: '1',
 
   detect(entry) {
     return entry?.provider === 'himalayas' ? { url: FEED_URL } : null;
@@ -119,6 +120,7 @@ export function parseHimalayasResponse(json) {
     jobs.push({
       title,
       url,
+      ...(item.id != null ? { externalId: String(item.id) } : {}),
       company: cleanText(item.companyName),
       location: locationText(item.locationRestrictions),
       postedAt: toEpochMs(item.pubDate),

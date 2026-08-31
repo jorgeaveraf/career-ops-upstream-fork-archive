@@ -12,6 +12,7 @@ const FEED_URL = 'https://www.workingnomads.com/api/exposed_jobs/';
 /** @type {Provider} */
 export default {
   id: 'workingnomads',
+  version: '1',
 
   /**
    * Fetches and normalizes postings from the Working Nomads public feed.
@@ -33,6 +34,7 @@ export default {
       .map(j => ({
         title: j.title.trim(),
         url: j.url.trim(),
+        ...(j.id != null ? { externalId: String(j.id) } : {}),
         company: typeof j.company_name === 'string' && j.company_name.trim() ? j.company_name.trim() : (entry.name || 'Working Nomads'),
         location: typeof j.location === 'string' ? j.location.trim() : '',
       }));

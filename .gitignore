@@ -1,6 +1,8 @@
 # Personal data (user fills these)
 cv.md
 article-digest.md
+candidate/*
+!candidate/.gitkeep
 local/
 # Everything under data/ is generated or personal at runtime — only .gitkeep
 # placeholders are tracked (verify with `git ls-files data/`). A blanket rule
@@ -23,6 +25,18 @@ output/*
 !output/.gitkeep
 batch/logs/*
 !batch/logs/.gitkeep
+logs/*
+!logs/.gitkeep
+!logs/browser/
+logs/browser/*
+!logs/browser/.gitkeep
+!logs/browser/discovery/
+logs/browser/discovery/*
+!logs/browser/discovery/.gitkeep
+backups/*
+!backups/.gitkeep
+tmp/*
+!tmp/.gitkeep
 batch/batch-state.tsv
 batch/batch-input.tsv
 batch/tracker-additions/**/*.tsv
@@ -57,6 +71,8 @@ writing-samples/*
 config/profile.yml
 config/cv-facts.json
 config/benchmarks.yml
+config/browser-research.json
+config/google-oauth-client.json
 portals.yml
 modes/_profile.md
 modes/_custom.md

@@ -1,0 +1,72 @@
+{
+  "greenhouse": {
+    "provider": "greenhouse-api",
+    "externalId": "4722386005",
+    "sourceUrl": "https://job-boards.greenhouse.io/gleanwork/jobs/4722386005?utm_source=test",
+    "canonicalUrl": "https://job-boards.greenhouse.io/gleanwork/jobs/4722386005",
+    "title": "Strategic Solutions Engineer",
+    "company": "Glean, Inc.",
+    "location": "Remote - United States",
+    "description": "Build trusted enterprise AI solutions with customers and partner with engineering on deployment architecture.",
+    "postedAt": "2026-08-07T00:00:00.000Z",
+    "extractionMethod": "direct",
+    "confidence": "high"
+  },
+  "himalayasCrossSource": {
+    "provider": "himalayas-api",
+    "sourceUrl": "https://himalayas.app/companies/glean/jobs/strategic-solutions-engineer?utm_campaign=daily",
+    "canonicalUrl": "https://job-boards.greenhouse.io/gleanwork/jobs/4722386005?gh_src=himalayas",
+    "title": "Strategic Solutions Engineer",
+    "company": "Glean",
+    "location": "Remote - United States",
+    "description": "Build trusted enterprise AI solutions with customers and partner with engineering on deployment architecture.",
+    "extractionMethod": "parsed",
+    "confidence": "medium"
+  },
+  "changedGreenhouse": {
+    "provider": "greenhouse-api",
+    "externalId": "4722386005",
+    "sourceUrl": "https://job-boards.greenhouse.io/gleanwork/jobs/4722386005",
+    "canonicalUrl": "https://job-boards.greenhouse.io/gleanwork/jobs/4722386005",
+    "title": "Strategic Solutions Engineer",
+    "company": "Glean, Inc.",
+    "location": "Remote - United States",
+    "description": "Build trusted enterprise AI solutions with customers. New requirement: lead production evaluations and incident reviews.",
+    "postedAt": "2026-08-07T00:00:00.000Z",
+    "extractionMethod": "direct",
+    "confidence": "high"
+  },
+  "similarDistinct": {
+    "provider": "greenhouse-api",
+    "externalId": "9999999005",
+    "sourceUrl": "https://job-boards.greenhouse.io/gleanwork/jobs/9999999005",
+    "canonicalUrl": "https://job-boards.greenhouse.io/gleanwork/jobs/9999999005",
+    "title": "Strategic Solutions Engineer",
+    "company": "Glean, Inc.",
+    "location": "Remote - United States",
+    "description": "Build trusted enterprise AI solutions with customers and partner with engineering on deployment architecture.",
+    "extractionMethod": "direct",
+    "confidence": "high"
+  },
+  "ashbyNoExternalId": {
+    "provider": "ashby-api",
+    "sourceUrl": "https://jobs.ashbyhq.com/example/2c7dc676-bb52-48e8-9e8a-41f9482f343f?utm_medium=feed",
+    "title": "AI Platform Engineer",
+    "company": "Example Labs",
+    "location": "Remote",
+    "description": "Own model serving, evaluation infrastructure, observability, and reliable distributed data systems.",
+    "extractionMethod": "direct",
+    "confidence": "high"
+  },
+  "lever": {
+    "provider": "lever-api",
+    "externalId": "3f7a6dd0-616f-4f78-92bd-4e0d21081111",
+    "sourceUrl": "https://jobs.lever.co/example/3f7a6dd0-616f-4f78-92bd-4e0d21081111?lever-source=board",
+    "title": "Senior Data Engineer",
+    "company": "Example Labs",
+    "location": "Mexico / Remote",
+    "description": "Design reliable batch and streaming data systems with strong data quality and operational ownership.",
+    "extractionMethod": "direct",
+    "confidence": "high"
+  }
+}

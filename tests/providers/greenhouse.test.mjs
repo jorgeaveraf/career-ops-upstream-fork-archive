@@ -145,17 +145,22 @@ try {
     pass('greenhouse.fetch() preserves a valid epoch-0 first_published as postedAt 0');
   else fail(`greenhouse.fetch() epoch-0 postedAt = ${JSON.stringify(epochZero[0]?.postedAt)}`);
 
-  // Malformed response bodies → empty result, no crash.
+  // Malformed response bodies are schema failures, not indistinguishable empty boards.
   const emptyCases = [null, {}, { jobs: null }, { jobs: 'nope' }];
   let emptyOk = true;
   for (const body of emptyCases) {
-    const out = await greenhouse.fetch(
-      { name: 'Acme', careers_url: 'https://job-boards.greenhouse.io/acme' },
-      { fetchJson: async () => body },
-    );
-    if (!Array.isArray(out) || out.length !== 0) { emptyOk = false; fail(`greenhouse.fetch() body=${JSON.stringify(body)} → ${JSON.stringify(out)}`); break; }
+    try {
+      await greenhouse.fetch(
+        { name: 'Acme', careers_url: 'https://job-boards.greenhouse.io/acme' },
+        { fetchJson: async () => body },
+      );
+      emptyOk = false;
+    } catch (error) {
+      if (!/unexpected API response/.test(error.message)) emptyOk = false;
+    }
   }
-  if (emptyOk) pass('greenhouse.fetch() returns [] for null / {} / non-array jobs response bodies');
+  if (emptyOk) pass('greenhouse.fetch() rejects null / {} / non-array jobs as schema changes');
+  else fail('greenhouse.fetch() should reject malformed response bodies');
 
   // Guard chain runs BEFORE any request: an untrusted api: must throw without
   // ever calling fetchJson.

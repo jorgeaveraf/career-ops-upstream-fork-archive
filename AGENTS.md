@@ -10,16 +10,17 @@ Built and used by [santifer](https://santifer.io) to evaluate 740+ offers, gener
 
 Two layers — full list in `DATA_CONTRACT.md`:
 
-- **User Layer (NEVER auto-updated; personalization goes HERE):** `cv.md`, `config/profile.yml`, `modes/_profile.md`, `modes/_custom.md`, `article-digest.md`, `portals.yml`, `data/*`, `reports/*`, `output/*`, `interview-prep/*`
+- **User Layer (NEVER auto-updated; personalization goes HERE):** `candidate/*`, `cv.md`, `config/profile.yml`, `modes/_profile.md`, `modes/_custom.md`, `article-digest.md`, `portals.yml`, `data/*`, `reports/*`, `output/*`, `interview-prep/*`
 - **System Layer (auto-updatable; DON'T put user data here):** `modes/_shared.md` and all other modes, `AGENTS.md`, `CLAUDE.md`, `CODEX.md`, `OPENCODE.md`, `KIMI.md`, `GEMINI.md`, `*.mjs` scripts, `dashboard/*`, `templates/*`, `batch/*`
 
-**THE RULE: When the user asks to customize facts or targeting (archetypes, narrative, negotiation scripts, proof points, location policy, comp targets), ALWAYS write to `modes/_profile.md` or `config/profile.yml`. When they ask for procedural house rules, custom workflows, output preferences, or automations, write to `modes/_custom.md` (copy it from `modes/_custom.template.md` if missing). NEVER edit `modes/_shared.md` for user-specific content.** This ensures system updates don't overwrite their customizations.
+**THE RULE: When the user asks to customize targeting (archetypes, narrative, negotiation scripts, location policy, comp targets), ALWAYS write to `modes/_profile.md` or `config/profile.yml`. New factual evidence must first be recorded in an approved factual source (`cv.md`, `config/profile.yml`, or `interview-prep/story-bank.md`) and then linked from `candidate/`; never add an unsupported standalone KB claim. When they ask for procedural house rules, custom workflows, output preferences, or automations, write to `modes/_custom.md` (copy it from `modes/_custom.template.md` if missing). NEVER edit `modes/_shared.md` for user-specific content.** This ensures system updates don't overwrite their customizations.
 
 ## Source-of-Truth Boundary (CRITICAL)
 
 User-facing content (CV, cover letters, application emails, form answers, recruiter outreach) is generated **exclusively** from these files plus statements the user makes directly in the current conversation:
 
 - `cv.md` · `article-digest.md` · `config/profile.yml` · `modes/_profile.md` · `writing-samples/`
+- `candidate/*` through `CandidateKnowledgeProvider` (structured claims must retain approved source references; `UNKNOWN`/`INFERRED` entries never authorize factual claims)
 - `modes/_custom.md` (procedural/style rules only — never introduces factual claims)
 - `voice-dna.md` (voice/style only — never introduces factual claims)
 - `interview-prep/story-bank.md` and `interview-prep/{company}-{role}.md` (the user's own STAR stories and prep notes — same trust level as `cv.md`; consumed by `interview` and `apply`/`match-star`)
@@ -79,6 +80,7 @@ AI-powered, CLI-agnostic job search automation: pipeline tracking, offer evaluat
 | `data/pipeline.md` | Inbox of pending URLs |
 | `data/scan-history.tsv` | Scanner dedup history |
 | `data/scan-runs.tsv` | Per-run scan counters (appended by `scan.mjs`, read by `stats.mjs`) |
+| `data/career.db` | Gitignored SQLite operational source of truth for acquisition runs, jobs, assessments, evaluations, packages, Contact Intelligence, sheet syncs, and imported human actions; see `docs/JOB_REGISTRY.md` |
 | `data/follow-ups.md` | Follow-up history tracker |
 | `data/blacklist.md` | Do-not-apply companies (user layer, opt-in, never auto-populated; respected by `scan.mjs` and the `auto-pipeline`/`oferta`/`apply` gates) |
 | `data/salary-observations.tsv` | Append-only salary observation log (user layer) |
@@ -92,6 +94,20 @@ AI-powered, CLI-agnostic job search automation: pipeline tracking, offer evaluat
 | `generate-pdf.mjs` | Playwright: HTML to PDF |
 | `generate-latex.mjs` | LaTeX CV validator + pdflatex compiler |
 | `scan.mjs` | Zero-token portal scanner (Greenhouse/Ashby/Lever APIs, zero LLM cost) |
+| `daily-runner.mjs` | Local discovery orchestrator: run lifecycle, single-run lock/recovery, structured summary, and automation-safe exit codes; see `docs/DAILY_RUNNER.md` |
+| `daily-auto.mjs` / `automation/` | Scheduler-ready operational loop over Daily Runner, ranking, deterministic evaluation/packages, Sheets sync, and opt-in summary email; see `docs/DAILY_AUTOMATION.md` |
+| `health.mjs`, `backup.mjs`, `launch-agent.mjs`, `browser-launch-agent.mjs` / `operations/` | Local macOS health, startup validation, SQLite backup, private logs, scheduled-run guards, and idempotent LaunchAgent preparation; see `docs/LOCAL_PRODUCTION.md` |
+| `browser-research.mjs` / `research/` | Separate research-only Jorge-profile Research plus manual/scheduled Browser Discovery for LinkedIn/Indeed/OCC using Acquisition and Registry boundaries; it is not in `daily:auto`; see `docs/BROWSER_RESEARCH_POLICY.md` |
+| `discovery-strategy.mjs` / `discovery-strategy/` | Candidate-KB-backed search strategy, platform runbooks, rejection/compensation policy, deterministic tasks, explanations, and Facebook authenticity scoring; see `docs/DISCOVERY_STRATEGY.md` |
+| `job-registry.mjs` | Inspect or explicitly bootstrap the persistent Job Registry (`schema`, `jobs`, `summary`, `bootstrap`) |
+| `acquisition/` | Uniform provider results, provenance/evidence, semantic content validation, and optional public PageReader fallback; see `docs/ACQUISITION.md` |
+| `opportunity-funnel.mjs` / `intelligence/` | Explicit, deterministic eligibility and opportunity ranking with versioned registry assessments; see `docs/OPPORTUNITY_FUNNEL.md` |
+| `candidate-kb.mjs` / `candidate-knowledge/` | Read-only access, validation, evidence lookup, and versioning for the user-owned Candidate Knowledge Base in `candidate/`; see `docs/CANDIDATE_KB.md` |
+| `deep-evaluate.mjs` / `deep-evaluation/` | Explicit shortlist-only deep job analysis, evidence matching, optional structured LLM reasoning, post-output validation, and versioned evaluation artifacts; see `docs/DEEP_EVALUATION.md` |
+| `application-package.mjs` / `application-package/` | Explicit VALID-APPLY-only resume variant, cover letter, outreach drafts, notes, evidence validation, versioned packages, and human-review state; see `docs/APPLICATION_PACKAGE.md` |
+| `contact-intelligence.mjs` / `contact-intelligence/` | Evidence-backed company/person research, conservative relationship modeling, outreach strategy, and versioned human-review artifacts; see `docs/CONTACT_INTELLIGENCE.md` |
+| `human-control-plane.mjs` / `human-control-plane/` | Idempotent Google Sheets projection and allowlisted human-input import while SQLite remains authoritative; see `docs/HUMAN_CONTROL_PLANE.md` |
+| `facebook.mjs` / `facebook/` | Bounded, research-only Facebook community discovery and joined-group monitoring; membership is human-only and all social/application actions stay blocked; see `docs/FACEBOOK_COMMUNITIES.md` |
 | `scan-ats-full.mjs` | Reverse-ATS keyword-first scanner over full public ATS datasets (Greenhouse/Lever/Ashby/Workday/iCIMS), filtered by portals.yml `title_filter`/`location_filter` — no company list needed; checkpoints every 500 companies, `--resume` continues an interrupted sweep |
 | `scan-interamt.mjs` | Playwright browser scanner for Interamt.de (German public sector portal — Apache Wicket, no REST API) |
 | `check-liveness.mjs` / `liveness-core.mjs` | Job posting liveness checker + shared logic (expired signals win over generic Apply text) |

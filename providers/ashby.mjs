@@ -147,6 +147,7 @@ function formatLocation(j) {
 /** @type {Provider} */
 export default {
   id: 'ashby',
+  version: '1',
 
   detect(entry) {
     try {
@@ -170,16 +171,19 @@ export default {
       }
       try {
         const json = /** @type {any} */ (await ctx.fetchJson(apiUrl, { timeoutMs: ASHBY_TIMEOUT_MS, redirect: 'error' }));
-        const jobs = Array.isArray(json?.jobs) ? json.jobs : [];
+        if (!Array.isArray(json?.jobs)) throw new Error('ashby: unexpected API response — expected { jobs: [...] }');
+        const jobs = json.jobs;
         return jobs.map(/** @param {any} j */ (j) => ({
           title: j.title || '',
           url: j.jobUrl || '',
+          externalId: j.id == null ? undefined : String(j.id),
           company: entry.name,
           location: formatLocation(j),
           salary: parseCompensation(j),
           postedAt: toEpochMs(j.publishedAt),
         }));
       } catch (e) {
+        if (/unexpected API response/.test(String(e?.message || e))) throw e;
         lastErr = e;
       }
     }

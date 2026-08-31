@@ -48,6 +48,18 @@ import { normalizeCompanyName } from './invite-match.mjs';
 import { withPipelineLock } from './pipeline-lock.mjs';
 import { flagValue, hasFlag } from './lib/cli-flags.mjs';
 import { withPortalHealthLock } from './portal-health-lock.mjs';
+import { openJobRegistry } from './registry/job-registry.mjs';
+import {
+  acquireProvider,
+  throwForAcquisitionFailure,
+  toNormalizedObservation,
+} from './acquisition/provider-adapter.mjs';
+import {
+  enrichJobFromPublicWeb,
+  PublicWebReader,
+  publicWebFallbackConfig,
+} from './acquisition/public-web-fallback.mjs';
+import { providerFailureOutcome } from './runner/provider-policy.mjs';
 
 try {
   const { config } = await import('dotenv');
@@ -84,6 +96,12 @@ const PROVIDERS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)),
 mkdirSync('data', { recursive: true });
 
 const CONCURRENCY = 10;
+
+// Kept outside main so the direct-invocation catch can mark an interrupted
+// registry run failed. Tests import this module without starting a run.
+let activeRegistry = null;
+let activeRegistryRunId = null;
+let activeRegistryManaged = false;
 
 // Provider loading + routing live in providers/_registry.mjs so the portal
 // health check (verify-portals.mjs) can reuse the exact same layer without
@@ -2011,6 +2029,9 @@ function guardStatusFor(code) {
 async function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes('--dry-run');
+  const managedRun = process.env.CAREER_OPS_MANAGED_RUN === '1';
+  const managedRunId = process.env.CAREER_OPS_RUN_ID || '';
+  if (managedRun && !managedRunId) throw new Error('CAREER_OPS_RUN_ID is required for a managed scan');
   const verify = args.includes('--verify');
   // Opt-in: on an anti-bot challenge (e.g. pracuj.pl Cloudflare wall), retry the
   // URL in a headed browser. Off by default — headed Chromium needs a display, so
@@ -2141,6 +2162,8 @@ async function main() {
   const countryEligibilityFilter = buildCountryEligibilityFilter(config.country_eligibility_filter, candidateCountry);
   const visaFilter = buildVisaFilter(config.visa_filter);
   const visaEnabled = Boolean(config.visa_filter) && config.visa_filter.enabled !== false;
+  const webFallback = publicWebFallbackConfig(config);
+  const publicWebReader = webFallback.enabled ? new PublicWebReader({ enableJina: webFallback.jina }) : null;
 
   // 3. Resolve a provider for each enabled company / board
   const targets = [];
@@ -2200,6 +2223,32 @@ async function main() {
   console.log(`Scanning ${parts.join('; ')} via providers`);
   if (dryRun) console.log('(dry run — no files will be written)\n');
 
+  // SQLite is the operational memory; Markdown/TSV remain compatibility views.
+  // Dry runs leave no registry trace. Providers never see this handle: their
+  // Job[] output is buffered and persisted through this one boundary below.
+  const registry = dryRun ? null : openJobRegistry();
+  const registryRun = registry?.startRun({
+    id: managedRunId || undefined,
+    type: process.env.CAREER_OPS_RUN_TYPE || 'scan',
+    ownerPid: process.pid,
+    metadata: {
+      portalsPath: PORTALS_PATH,
+      filterCompany,
+      verify,
+      targetCount: targets.length,
+      publicWebFallback: webFallback,
+    },
+  });
+  if (managedRun && registryRun?.status !== 'RUNNING') {
+    registry.close();
+    throw new Error(`managed run ${managedRunId} is not RUNNING`);
+  }
+  activeRegistry = registry;
+  activeRegistryRunId = registryRun?.id || null;
+  activeRegistryManaged = managedRun;
+  const acquiredObservations = [];
+  const providerResults = [];
+
   // 3.5. Load the user's do-not-apply list (#1742). Opt-in: absent file =
   // empty Map = the filter below never fires.
   const blacklist = loadBlacklist();
@@ -2232,10 +2281,14 @@ async function main() {
   let totalDupes = 0;
   const newOffers = [];
   const errors = [...resolveErrors];
+  const acquisitionFailures = [];
   const emptyTargets = [];
+  let pageReadsStarted = 0;
 
   const tasks = targets.map(company => async () => {
     let provider = company._provider;
+    const providerStartedAt = new Date().toISOString();
+    let targetPageReads = 0;
     // includeUndated is deliberately ALWAYS true, independent of the window.
     // It does not mean "include undated postings in the results" — scan.mjs
     // already decides that downstream, where buildPostedDateFilter passes a
@@ -2255,15 +2308,20 @@ async function main() {
     try {
       let jobs;
       try {
-        jobs = await provider.fetch(company, ctx);
+        jobs = throwForAcquisitionFailure(await (provider.acquire || acquireProvider.bind(null, provider))(company, ctx, {
+          runId: registryRun?.id || '', retrievedAt: providerStartedAt,
+        }));
       } catch (parserErr) {
         if (provider.id !== 'local-parser') throw parserErr;
         const fallback = resolveProvider(company, providers, { skipIds: ['local-parser'] });
         if (!fallback || fallback.error) throw parserErr;
         provider = fallback.provider;
         sourceName = `${provider.id}-api`;
-        jobs = await provider.fetch(company, ctx);
+        jobs = throwForAcquisitionFailure(await (provider.acquire || acquireProvider.bind(null, provider))(company, ctx, {
+          runId: registryRun?.id || '', retrievedAt: providerStartedAt,
+        }));
         errors.push({
+          provider: 'local-parser',
           company: company.name,
           error: `local parser failed, used API fallback: ${parserErr.message}`,
         });
@@ -2277,6 +2335,34 @@ async function main() {
       }
 
       for (const job of jobs) {
+        if (publicWebReader && !job.description && targetPageReads < webFallback.maxPagesPerTarget) {
+          targetPageReads++;
+          pageReadsStarted++;
+          const enrichment = await enrichJobFromPublicWeb(job, publicWebReader, ctx);
+          Object.assign(job, enrichment.job);
+          const page = enrichment.result;
+          if (!page.ok) {
+            acquisitionFailures.push({
+              provider: page.error.providerId,
+              company: company.name,
+              error: page.error.safeMessage,
+              acquisitionCode: page.error.code,
+              retryable: page.error.retryable,
+            });
+          }
+        }
+        // Capture every sufficiently identified provider result before user
+        // filters/dedup. This lets the registry answer "seen before?" even for
+        // a role that did not enter pipeline.md. Invalid provider records keep
+        // following the scanner's existing handling and are not invented here.
+        if (job && job.url && job.title && (job.company || company.name)) {
+          acquiredObservations.push(toNormalizedObservation(job, {
+            providerId: sourceName,
+            runId: registryRun?.id || '',
+            retrievedAt: providerStartedAt,
+            trackedTarget: company.name,
+          }));
+        }
         // Trust enrichment — runs before filters, never drops
         const trustResult = trustValidator(job);
         job.trustScore = trustResult.score;
@@ -2374,16 +2460,61 @@ async function main() {
           careersUrlDomain,
         });
       }
+      providerResults.push({
+        provider: provider.id,
+        target: company.name,
+        status: 'SUCCESS',
+        observations: jobs.length,
+        startedAt: providerStartedAt,
+        finishedAt: new Date().toISOString(),
+      });
     } catch (err) {
-      errors.push({
+      const outcome = providerFailureOutcome({ required: company.required !== false, code: classifyFetchError(err), message: err.message });
+      if (outcome.affectsRunStatus) errors.push({
+        provider: provider.id,
         company: company.name,
         error: err.message,
         kind: classifyFetchError(err),
+        acquisitionCode: err.acquisitionCode,
+        retryable: err.retryable,
+      });
+      providerResults.push({
+        provider: provider.id,
+        target: company.name,
+        status: outcome.status,
+        observations: 0,
+        errorCode: outcome.code,
+        errorMessage: err.message,
+        startedAt: providerStartedAt,
+        finishedAt: new Date().toISOString(),
       });
     }
   });
 
   await parallelFetch(tasks, CONCURRENCY);
+
+  // One transaction for the complete acquisition batch. If it fails, no
+  // partial job/observation set from this run survives and Markdown is not
+  // written, preserving the operational-source-of-truth boundary.
+  if (registry && registryRun) {
+    try {
+      registry.recordProviderResults(registryRun.id, providerResults);
+      registry.recordObservations(registryRun.id, acquiredObservations);
+    } catch (error) {
+      if (managedRun) {
+        registry.recordRunFailure(registryRun.id, {
+          code: 'PERSISTENCE_FAILURE', message: error.message, retryable: false,
+        });
+      } else {
+        registry.failRun(registryRun.id, error, { stage: 'record_observations' });
+      }
+      registry.close();
+      activeRegistry = null;
+      activeRegistryRunId = null;
+      activeRegistryManaged = false;
+      throw error;
+    }
+  }
 
   // 5.5. Optional liveness verification — drop expired and guard-rejected postings
   let verifiedOffers = newOffers;
@@ -2462,6 +2593,36 @@ async function main() {
     }
   }
 
+  let registrySummary = null;
+  if (registry && registryRun) {
+    for (const error of [...errors, ...acquisitionFailures]) {
+      registry.recordRunFailure(registryRun.id, {
+        provider: error.provider || '',
+        target: error.company || '',
+        code: error.acquisitionCode || (error.kind === 'auth' ? 'AUTH_REQUIRED'
+          : error.kind === 'network' ? 'UPSTREAM_UNAVAILABLE'
+            : error.kind === 'server' ? 'UPSTREAM_UNAVAILABLE'
+              : 'SCHEMA_CHANGED'),
+        message: error.error || 'provider failure',
+        retryable: error.retryable ?? (error.kind === 'network' || error.kind === 'server'),
+      });
+    }
+    registrySummary = managedRun
+      ? registry.getRunSummary(registryRun.id)
+      : registry.finishRun(registryRun.id, {
+        status: errors.length > 0 ? 'PARTIAL' : 'SUCCESS',
+        metadata: {
+          portalsPath: PORTALS_PATH,
+          filterCompany,
+          verify,
+          targetCount: targets.length,
+          fetched: totalFound,
+          publicWebFallback: webFallback,
+          pageReadsStarted,
+        },
+      });
+  }
+
   // 7. Print summary
   console.log(`\n${'━'.repeat(45)}`);
   console.log(`Portal Scan — ${date}`);
@@ -2531,6 +2692,12 @@ async function main() {
     console.log(`Invalid (guarded):     ${invalidOffers.length} dropped`);
   }
   console.log(`New offers added:      ${verifiedOffers.length}`);
+  if (registrySummary) {
+    console.log(`Registry observations:${String(registrySummary.observations).padStart(7)} recorded`);
+    console.log(`Registry new jobs:    ${String(registrySummary.newJobs).padStart(7)}`);
+    console.log(`Registry known jobs:  ${String(registrySummary.knownJobs).padStart(7)}`);
+    console.log(`Registry changed jobs:${String(registrySummary.changedJobs).padStart(7)}`);
+  }
 
   // Trust validation summary (only when trust_filter is configured)
   if (config.trust_filter && config.trust_filter.enabled !== false && verifiedOffers.length > 0) {
@@ -2671,6 +2838,13 @@ async function main() {
     });
   }
 
+  if (registry) {
+    registry.close();
+    activeRegistry = null;
+    activeRegistryRunId = null;
+    activeRegistryManaged = false;
+  }
+
   console.log(`\n→ Run /career-ops pipeline to evaluate new offers.`);
   console.log('→ Share results and get help: https://discord.gg/8pRpHETxa4');
 
@@ -2696,6 +2870,21 @@ async function main() {
 // `|| ''` guards the case where Node is invoked without a script arg (e.g. `node -e`).
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   main().catch(err => {
+    if (activeRegistry && activeRegistryRunId) {
+      try {
+        if (activeRegistryManaged) {
+          activeRegistry.recordRunFailure(activeRegistryRunId, {
+            code: 'ORCHESTRATION_FAILURE', message: err.message, retryable: false,
+          });
+        } else {
+          activeRegistry.failRun(activeRegistryRunId, err, { stage: 'scan_fatal' });
+        }
+      } catch { /* best effort */ }
+      try { activeRegistry.close(); } catch { /* best effort */ }
+      activeRegistry = null;
+      activeRegistryRunId = null;
+      activeRegistryManaged = false;
+    }
     console.error('Fatal:', err.message);
     process.exit(1);
   });

@@ -1,0 +1,9 @@
+{
+  "name": "career-ops-command-gateway",
+  "version": "3.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": { "start": "node server.mjs", "test": "node --test test/*.test.mjs" },
+  "dependencies": { "@google-cloud/pubsub": "^6.0.1" }
+}

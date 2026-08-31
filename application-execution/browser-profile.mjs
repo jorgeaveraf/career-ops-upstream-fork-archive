@@ -1,0 +1,6 @@
+import{existsSync,readFileSync}from'fs';import path from'path';
+const normalize=value=>String(value||'').trim().toLowerCase();
+export function selectApplicationChromeProfile({profile='jorge',mode='application_submit',userDataDir}={}){
+  if(normalize(mode)!=='application_submit')throw new Error('APPLICATION_BROWSER_MODE must be application_submit');const root=path.resolve(String(userDataDir||''));if(!userDataDir||!existsSync(root))throw new Error('APPLICATION_BROWSER_USER_DATA_DIR is unavailable');
+  const state=JSON.parse(readFileSync(path.join(root,'Local State'),'utf8'));const matches=Object.entries(state?.profile?.info_cache||{}).filter(([,item])=>normalize(item?.name)===normalize(profile));if(matches.length!==1)throw new Error(`expected exactly one Chrome profile named ${profile}; found ${matches.length}`);const[profileDirectory,metadata]=matches[0];const profilePath=path.resolve(root,profileDirectory);if(!profilePath.startsWith(`${root}${path.sep}`)||!existsSync(profilePath))throw new Error('application Chrome profile directory is unavailable');return{profile:normalize(profile),mode:'application_submit',userDataDir:root,profileDirectory,profilePath,profileName:metadata.name};
+}

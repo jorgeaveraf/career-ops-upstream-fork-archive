@@ -67,9 +67,10 @@ try {
     pass('remoteok.fetch() keeps 2 valid jobs (drops metadata row, null, non-object, empty-position, bad-url rows)');
   else fail(`remoteok.fetch() returned ${fetched.length} jobs (expected 2): ${JSON.stringify(fetched)}`);
 
-  // Normalized shape: exactly { title, url, company, location }.
-  if (fetched[0] && Object.keys(fetched[0]).sort().join(',') === 'company,location,title,url')
-    pass('remoteok.fetch() returns the normalized { title, url, company, location } shape');
+  // Normalized shape plus provider-native identity when the feed exposes slug/id.
+  if (fetched[0] && Object.keys(fetched[0]).sort().join(',') === 'company,externalId,location,title,url'
+      && fetched[0].externalId === 'acme-staff-ai-engineer')
+    pass('remoteok.fetch() preserves slug as externalId alongside normalized fields');
   else fail(`remoteok.fetch() row 0 keys = ${JSON.stringify(fetched[0] && Object.keys(fetched[0]))}`);
 
   if (fetched[0]?.title === 'Staff AI Engineer'

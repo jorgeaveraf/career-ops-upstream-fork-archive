@@ -46,6 +46,7 @@ function resolveApiUrl(entry) {
 /** @type {Provider} */
 export default {
   id: 'lever',
+  version: '1',
 
   detect(entry) {
     try {
@@ -61,10 +62,11 @@ export default {
     if (!apiUrl) throw new Error(`lever: cannot derive API URL for ${entry.name}`);
     assertLeverUrl(apiUrl);
     const json = await ctx.fetchJson(apiUrl, { redirect: 'error' });
-    if (!Array.isArray(json)) return [];
+    if (!Array.isArray(json)) throw new Error('lever: unexpected API response — expected a postings array');
     return json.map(j => ({
       title: j.text || '',
       url: j.hostedUrl || '',
+      externalId: j.id == null ? undefined : String(j.id),
       company: entry.name,
       location: j.categories?.location || '',
       // Lever's v0 postings list ships the full description for free (same

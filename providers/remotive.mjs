@@ -14,6 +14,7 @@ const FEED_URL = 'https://remotive.com/api/remote-jobs';
 /** @type {Provider} */
 export default {
   id: 'remotive',
+  version: '1',
 
   /**
    * Fetches and normalizes postings from the Remotive public feed.
@@ -35,6 +36,7 @@ export default {
       .map(j => ({
         title: j.title.trim(),
         url: j.url.trim(),
+        ...(j.id != null ? { externalId: String(j.id) } : {}),
         company: typeof j.company_name === 'string' && j.company_name.trim() ? j.company_name.trim() : (entry.name || 'Remotive'),
         location: typeof j.candidate_required_location === 'string' ? j.candidate_required_location.trim() : '',
       }));

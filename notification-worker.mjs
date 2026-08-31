@@ -1,0 +1,8 @@
+#!/usr/bin/env node
+import 'dotenv/config';
+import { pathToFileURL } from 'url';
+import { openJobRegistry } from './registry/job-registry.mjs';
+import { drainActionableNotifications, inspectNotificationProvider } from './notifications/runtime.mjs';
+
+async function main(){const command=process.argv[2]||'status';const registry=openJobRegistry();try{if(command==='status'){console.log(JSON.stringify({provider:inspectNotificationProvider(),metrics:registry.getNotificationMetrics(),recent:registry.listNotificationIntents({limit:10})},null,2));return;}if(command==='drain'){console.log(JSON.stringify(await drainActionableNotifications({registry}),null,2));return;}if(command==='probe'){if(!process.argv.includes('--send')){console.log(JSON.stringify({status:'DRY_RUN',template:{subject:'Career Ops notification test',body:'Career Ops V3D notification delivery is working.'},provider:inspectNotificationProvider()},null,2));return;}const inspection=inspectNotificationProvider();if(inspection.providerStatus!=='READY')throw Object.assign(new Error('notification provider is not configured'),{code:'PROVIDER_NOT_CONFIGURED'});const delivery=registry.notificationOutbox.enqueueDeliveryProbe();console.log(JSON.stringify({delivery,deliveryResult:await drainActionableNotifications({registry,limit:1})},null,2));return;}throw new Error(`unknown command: ${command}`);}finally{registry.close();}}
+if(import.meta.url===pathToFileURL(process.argv[1]||'').href)main().catch(error=>{console.error(JSON.stringify({status:'FAILED',code:error.code||'NOTIFICATION_WORKER_FAILED',message:error.message}));process.exitCode=1;});

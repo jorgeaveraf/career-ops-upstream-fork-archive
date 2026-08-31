@@ -1,0 +1,54 @@
+{
+  "enabledSources": ["linkedin", "indeed", "occ", "facebook"],
+  "jobQueries": ["AI Systems Engineer", "AI Platform Engineer", "Senior Data Engineer"],
+  "markets": ["Remote contractor", "LATAM global"],
+  "companySource": "web",
+  "companyLimit": 20,
+  "browser_execution": {
+    "navigationMs": 30000,
+    "readinessMs": 15000,
+    "pollMs": 500,
+    "maxScrollPasses": 5,
+    "maxScrollMs": 12000,
+    "stablePasses": 2,
+    "maxCards": 25,
+    "maxDetails": 5,
+    "maxTaskMs": 60000,
+    "maxTotalTasks": 8,
+    "maxTasksPerSource": 3,
+    "maxWindowMs": 300000
+  },
+  "browser_discovery": {
+    "enabled": true,
+    "useDiscoveryStrategy": true,
+    "maxResultsPerTask": 10,
+    "queries": ["AI Systems Engineer", "AI Platform Engineer", "Senior AI Engineer", "Data Engineer", "Solutions Architect"],
+    "sources": {
+      "linkedin": { "enabled": true, "queries": ["AI Systems Engineer", "AI Platform Engineer", "Senior AI Engineer"] },
+      "indeed": { "enabled": true, "queries": ["Remote AI Engineer", "Senior Data Engineer"] },
+      "occ": { "enabled": true },
+      "facebook": { "enabled": false }
+    },
+    "filters": {
+      "remote": true,
+      "seniority": "senior",
+      "contractor": "preferred",
+      "technology": true,
+      "markets": ["LATAM", "global"]
+    }
+  },
+  "browser_enrichment": {
+    "enabled": true,
+    "maxTasks": 5,
+    "priority": "TOP_10_then_HIGH_then_value_freshness_completeness",
+    "packages": false,
+    "sheetRefresh": false
+  },
+  "sources": [
+    { "id": "linkedin", "searchUrlTemplate": "https://www.linkedin.com/jobs/search/?keywords={query}&location={market}" },
+    { "id": "indeed", "searchUrlTemplate": "https://mx.indeed.com/jobs?q={query}&l={market}" },
+    { "id": "occ", "searchUrlTemplate": "https://www.occ.com.mx/empleos/?q={query}&location={market}" },
+    { "id": "facebook", "searchUrlTemplate": "https://www.facebook.com/search/posts/?q={query}%20{market}" },
+    { "id": "web", "searchUrlTemplate": "https://www.google.com/search?q={query}" }
+  ]
+}

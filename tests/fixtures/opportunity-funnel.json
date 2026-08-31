@@ -1,0 +1,88 @@
+{
+  "profile": {
+    "location": {
+      "country": "Mexico",
+      "authorized_in": ["Mexico"],
+      "needs_sponsorship": true,
+      "international_contracting": { "accepted": true }
+    },
+    "target_roles": {
+      "primary": ["AI Systems Engineer"],
+      "alternatives": ["Senior Data Engineer", "Solutions Architect"],
+      "seniority": {
+        "preferred": ["Senior", "Staff", "Architect"],
+        "also_accepted": [{ "level": "Lead" }],
+        "excluded": ["Head", "Director"]
+      }
+    },
+    "search_preferences": {
+      "work_location": { "accepted": ["Remote"], "excluded": ["Hybrid", "On-site"] },
+      "employment_types": [
+        { "type": "Contract", "preference": 1, "minimum_commitment": "20 hours per week" },
+        { "type": "Fractional", "preference": 2, "minimum_commitment": "20 hours per week" },
+        { "type": "Part-time", "preference": 3, "minimum_commitment": "20 hours per week" },
+        { "type": "Full-time", "preference": 4, "condition": "Flexible hours required" }
+      ],
+      "schedule": { "local_timezone": "Mexico (UTC-6)" },
+      "work_preferences": { "excites": "architecture and end-to-end AI systems", "avoids": "night shifts and frequent on-call" },
+      "engagement_preferences": { "duration": "Long-term", "workload": "Consistent" }
+    },
+    "compensation": {
+      "by_employment_type": {
+        "full_time": { "minimum": 70000, "desired": 120000, "currency": "MXN", "period": "month" },
+        "part_time": { "minimum": 45, "desired": 60, "currency": "USD", "period": "hour" },
+        "contract": { "minimum": 40, "desired": 70, "currency": "USD", "period": "hour" },
+        "fractional": { "minimum": 60, "desired": 80, "currency": "USD", "period": "hour" }
+      }
+    }
+  },
+  "portals": {
+    "title_filter": {
+      "positive": ["AI Engineer", "AI Systems Engineer", "Senior Data Engineer", "Solutions Architect"],
+      "negative": ["Principal", "Manager"],
+      "seniority_boost": ["Senior", "Staff", "Lead", "Architect"]
+    },
+    "country_eligibility_filter": {
+      "exclusionary": ["must reside in the united states", "canada-based candidates only", "eu residents only"],
+      "inclusive": ["mexico", "worldwide", "global remote", "international contractor"]
+    }
+  },
+  "jobs": {
+    "usOnly": {
+      "title": "Senior AI Engineer",
+      "company": "Acme",
+      "location": "Remote",
+      "description": "Remote United States only. Must reside in the United States."
+    },
+    "worldwideContractor": {
+      "title": "AI Systems Engineer",
+      "company": "Acme",
+      "location": "Worldwide",
+      "description": "Independent contractor working remotely from anywhere."
+    },
+    "remoteAmbiguous": {
+      "title": "Senior AI Engineer",
+      "company": "Acme",
+      "location": "Remote",
+      "description": "Build reliable AI services."
+    },
+    "director": {
+      "title": "Director of AI",
+      "company": "Acme",
+      "location": "Worldwide",
+      "description": "Lead the AI organization globally."
+    },
+    "leadLatamContractor": {
+      "title": "Lead AI Engineer",
+      "company": "Acme",
+      "location": "Remote — LATAM",
+      "description": "Long-term contractor role with flexible async hours, architecture ownership, end-to-end AI systems, and USD 70 to 80 per hour."
+    },
+    "flexibleFullTime": {
+      "title": "AI Systems Engineer",
+      "company": "Acme",
+      "location": "Worldwide",
+      "description": "Full-time distributed role with flexible hours and async collaboration."
+    }
+  }
+}

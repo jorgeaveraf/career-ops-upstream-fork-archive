@@ -118,14 +118,26 @@ career-ops is the first reference implementation of [the CareerOps Manifesto](ht
 | **Funded Company Discovery** | Review-first `company:funded` command surfaces recently funded companies and source diagnostics from structured public feeds without editing your data |
 | **Batch Processing**     | Parallel evaluation with headless CLI workers (`claude -p` / `opencode run`)                                                             |
 | **Dashboard TUI**        | Terminal UI to browse, filter, and sort your pipeline                                                                                    |
-| **Human-in-the-Loop**    | AI evaluates and recommends, you decide and act. The system never submits an application -- you always have the final call               |
+| **Human-in-the-Loop**    | AI evaluates and prepares; you give separate exact approvals. V4.3 can submit the approved application and supported outreach autonomously, while you keep the final call |
+| **Decision Memory**      | `REJECT` preserves exact notes and creates auditable soft preference signals; `HOLD` carries an opportunity forward; `NEXT_STAGE` queues bounded deep enrichment and never applies |
 | **Pipeline Integrity**   | Automated merge, dedup, status normalization, health checks                                                                              |
 | **Interview Suite**      | Time-blocked prep plans, practice sessions with feedback, post-interview debriefs ([`interview/`](modes/interview/README.md)), and a company red-flag detector ([`interview-redflag`](modes/interview-redflag.md)) |
 | **Offer Stage**          | Contract reading companion -- clause walk plus a lawyer question list ([`offer-prep`](modes/offer-prep.md)) -- and a desired/advertised/actual salary-gap analyzer (`salary-gap.mjs`) |
 | **Follow-ups & Replies** | Follow-up cadence calculator and seeded reminders (`followup-cadence.mjs`, `followup-seed.mjs`); employer reply classification into tracker updates ([`reply-watch`](modes/reply-watch.md)) |
 | **Pattern Analysis**     | Rejection patterns and per-ATS-channel advance rates (`analyze-patterns.mjs`), lifetime funnel stats (`stats.mjs`), repost/ghost-job detection (`detect-reposts.mjs`) |
 | **Plugin System**        | Opt-in integrations (Gmail, Notion, Apify + a community registry), disabled by default -- see [docs/PLUGINS.md](docs/PLUGINS.md)        |
-| **Beyond the CV**        | Company research ([`deep`](modes/deep.md)) surfaces AI strategy, recent moves, engineering culture, and the angle your profile should take. Contact discovery ([`contacto`](modes/contacto.md)) identifies the hiring manager, recruiter, or team peer worth reaching out to and drafts a ≤300-character LinkedIn message tuned to each contact type. Formal application email drafts ([`email`](modes/email.md)) turn an evaluated report or pasted JD into a subject line, body, and attachment checklist without sending, submitting, or clicking anything. Applications get you in the queue; research gets you a conversation. |
+| **Beyond the CV**        | Company research ([`deep`](modes/deep.md)) surfaces strategy and candidate angle. Contact discovery identifies one best verified person and prepares concise evidence-backed outreach. In the V4.3 operator flow, exact-approved candidate Gmail and safe LinkedIn outreach execute autonomously; unsupported routes remain manual with exact URL, message, reason, and timing. |
+
+### Human Decision
+
+- `REJECT` — “No quiero esta oportunidad.” Career Ops la retira de la cola activa, conserva exactamente tus Notes y usa el feedback como una señal explicable para priorizaciones futuras.
+- `HOLD` — “Consérvala, pero todavía no inviertas más trabajo.” Puede quedar como carryover y volver a ordenarse.
+- `NEXT_STAGE` — “Vale la pena investigarla a fondo.” Inicia preparación: evaluación, paquete, ruta oficial, Contact Intelligence y activation/outreach plan. No autoriza aplicación ni outreach.
+
+Cuando el plan llega a `READY`, `APPROVE_TO_APPLY` autoriza exactamente una aplicación y `APPROVE_OUTREACH` autoriza exactamente una acción de outreach. Son independientes; ninguna implica la otra.
+- `NO_ACTION` — “Todavía no hay decisión.”
+
+`Rejection Reason` es opcional. Una sola nota nunca se convierte en una regla dura global, y rechazar una vacante no bloquea automáticamente a su empresa.
 
 ## Quick Start
 
@@ -438,6 +450,58 @@ career-ops/
 
 - **[cv-santiago](https://github.com/santifer/cv-santiago)** -- The portfolio website (santifer.io) with AI chatbot, LLMOps dashboard, and case studies. If you need a portfolio to showcase alongside your job search, fork it and make it yours.
 
+## Facebook community research
+
+Facebook opportunity discovery is part of the scheduled Browser Research window. It reads bounded recent posts only in already joined or previously approved communities, checkpoints post identities, classifies concrete opportunities, and writes accepted observations through the same Job Registry and eligibility/ranking path as other sources. It never joins a new group, comments, replies, sends a DM, posts, or applies. `WANT_TO_JOIN` plus **Career Ops → Sync Communities** remains the separate exact human authorization for one group join. `SKIP` and `REJECT` soft-suppress a group without deleting history. See [Facebook Communities](docs/FACEBOOK_COMMUNITIES.md).
+
+The human lifecycle in `TODAY` is deliberately small: `DISCOVERED` means decide whether to prepare; `PREPARING` means Career Ops is queued, working, or blocked; and `READY` means the readiness invariant passed and one clear human action remains. A positively confirmed `APPLIED` job leaves `TODAY` and appears in `APPLICATIONS`. Rich technical states remain internal for recovery and safety. `APPROVE_TO_APPLY` authorizes one exact job/package/plan; execution is idempotent and records `APPLIED` only after observable confirmation. Career Ops never mass-applies or mass-messages.
+
+`READY` is proof, not optimistic copy. For an `APPLY` recommendation it requires a valid deep evaluation, resolved application path, current valid package, every required artifact (a cover letter may be `NOT_NEEDED`), sufficient evidence, no preparation blocker, Contact Intelligence completed with a relevant contact, `NONE_VERIFIED`, or an explicitly recorded blocked result, and a resolved application-activation strategy. A required resume that is `NOT_GENERATED` can never project as `READY`.
+
+During preparation, Contact Intelligence searches bounded public evidence for the most relevant recruiter, hiring manager, team lead, talent partner, functional leader, or recruiting route. A verified public profile is useful even without email. Public email is stored only when explicitly found and attributable; address patterns are never guessed. `NONE_VERIFIED` means the bounded search completed without a reliable person, not that one lookup returned empty. The activation planner then chooses `OUTREACH_RECOMMENDED`, `OUTREACH_OPTIONAL`, `NO_OUTREACH`, or `OUTREACH_BLOCKED`, one primary route, and conservative timing. TODAY shows the compact plan; CONTACTS retains the evidence.
+
+The preferred pursuit strategy is platform-first application plus one best verified contact when outreach is justified. `Application Decision` and `Outreach Decision` remain separate: `APPROVE_TO_APPLY` means Career Ops owns and applies to that exact job with the exact current package; it does not merely tell you where to apply. The executor prefers a native adapter and automatically falls back to the Generic Browser Executor. A genuine human-only boundary delegates only its micro-action while Career Ops preserves ownership and resumes automatically. `APPROVE_OUTREACH` separately authorizes one exact contact/channel/message/timing plan. After both approvals and **Sync Jobs**, Career Ops confirms the application before executing approved after-application outreach, schedules later timing automatically, and preserves pending outreach after the job moves to APPLICATIONS. No outreach decision is preselected.
+
+Candidate email is sent only through the Gmail API after the mailbox resolves exactly to `jorgeaveraf@gmail.com`; Resend and `career@brunova.mx` remain system-notification-only. `fubifo@gmail.com` is isolated for required platform account registration only: Career Ops may create the account, keep its generated password in macOS Keychain, and complete ordinary correlated email verification without exposing passwords or codes in the Sheet. It is prohibited as an application or outreach sender. LinkedIn uses a Career Ops-owned managed Jorge Chrome window and stops on login, MFA, CAPTCHA, challenge, restriction, rate limit, identity mismatch, or ambiguous delivery. Unsupported social channels surface a link and suggested message for manual action. Career Ops sends at most one primary outreach action per approved job, never guesses an email, never mass-messages, and never starts an automatic follow-up chain; a second follow-up needs its own exact authorization.
+
+Production infrastructure authentication is headless. Google Sheets is pinned to a Cloud Run IAM-signing + Workspace DWD broker with effective subject `brunova@brunova.mx`; the command subscriber pulls through its Cloud Run gateway. Neither path uses local user ADC, Chrome, RAPT, or a private service-account key. Candidate Gmail remains a separate one-time-consent OAuth lifecycle; its External/In Production app uses a post-publication token for `jorgeaveraf@gmail.com`, while Google verification remains a UX/user-cap concern. See [Authentication architecture](docs/AUTHENTICATION_ARCHITECTURE.md).
+
+All normal operator timestamps in TODAY, PIPELINE, APPLICATIONS, CONTACTS, FOLLOW_UPS, COMMUNITIES, SETTINGS, and notification copy are presented in Spanish using `America/Mexico_City`, for example `29 ago 2026 · 5:00 PM`. SQLite, events, logs, API payloads, and hashes continue to use canonical UTC ISO-8601.
+
+Career Ops te avisa cuando necesita una respuesta, hay un paquete listo para revisar, una aplicación se confirma o un workflow importante falla. No notifica cada actividad del sistema; el correo dirige a `TODAY`, que sigue siendo la superficie autoritativa para actuar.
+
+### V4.4 operator contract
+
+Career Ops owns every exactly approved application through confirmed completion. If a site requires CAPTCHA, MFA, login, a security check, a truthful personal fact, legal attestation, or platform confirmation, Career Ops pauses as `PAUSED_FOR_HUMAN` and asks only for that micro-action. It does not transfer the application or ask you to finish it manually.
+
+For browser boundaries, use `Open Application`, complete only the named step, and leave the prepared tab open. Career Ops preserves the exact managed Jorge Chrome window and checks automatically for resolution; CAPTCHA, login, MFA, and ordinary challenges do not require Sync Jobs. For personal facts, Career Ops shows every unresolved application question together in `Question Bundle`; answer all of them once in the yellow `Human Answer` cell and use **Sync Jobs** once. Reusable facts enter the candidate knowledge base, while compensation remains job-specific and legal attestations are never reused.
+
+`Handoff Type`, `Handoff Instruction`, `Open Application`, `Question Bundle`, and `Application Progress` make the boundary explicit in TODAY. CAPTCHA/MFA quick actions rank above ordinary fact questions. One application batch produces one consolidated human-assist email, not one email per application or retry. Background resume checks remain silent. SETTINGS shows Application Automation, Human Handoff, and Pending Human Assists.
+
+### V4.4.1 passive verification and question intelligence
+
+Career Ops waits through passive anti-bot verification automatically. reCAPTCHA legal/footer text, a loading interstitial, or a temporarily disabled Continue button does not become human attention by itself. The shared challenge resolver waits for a bounded 15–20 seconds, observes real progress, and continues the same session. Only a visible checkbox, puzzle, input, or other interactive verification becomes `Solve CAPTCHA`; Career Ops never attempts to bypass it. A passive timeout becomes a technical recovery signal rather than a false CAPTCHA handoff.
+
+Every supported application route uses the shared Application Question Resolver. It checks exact Candidate KB facts, the exact application plan, verified answer memory, conservative experience derivation, scoped candidate policy, and evidence-backed generated text—in that order—before asking the candidate. Stable answers such as authoritative English proficiency are reused; overlapping work periods are never double-counted; compensation answers match employment type, period, and currency; legal attestations and unsupported personal claims remain human-owned. Known fields are completed before the application pauses, and the question bundle contains only the irreducible remainder. See [Application Question Intelligence](docs/APPLICATION_QUESTION_INTELLIGENCE.md) and [Challenge Handling](docs/CHALLENGE_HANDLING.md).
+
+The complete model, recovery guarantees, and safety boundary are documented in [Human Handoff and Resume](docs/HUMAN_HANDOFF_AND_RESUME.md).
+
+Career Ops trabaja de forma autónoma y `TODAY` es tu única bandeja diaria. Si `Needs Your Attention = 0`, no hagas nada. Si es mayor que cero, atiende primero `HUMAN ATTENTION`, lee Attention Type/Reason/Allowed Actions, completa únicamente las celdas amarillas y usa **Career Ops → Sync Jobs**. Career Ops procesa tus respuestas y continúa solo.
+
+En V4.6, `TODAY_TARGET = 10` significa diez unidades legítimas de trabajo/decisión como máximo, no diez vacantes forzadas. Cada fila actionable, pinned o held-visible consume un slot; `Needs Your Attention` cuenta únicamente intervención humana actual. Cuando una fila sale, la misma política autoritativa rellena desde Registry hasta 10 o demuestra `EXHAUSTED`; `BLOCKED` se reserva para una falla real. Diagnóstico: `npm run today:diagnostics -- --trace`.
+
+`QUEUED` significa que Career Ops aceptó el trabajo y no requiere otra acción; `WORKING` significa que lo está ejecutando; `WAITING_FOR_YOU` aparece únicamente cuando existe una acción humana real. `ANSWER_REQUIRED` siempre muestra una pregunta concreta que puedes responder, nunca un código técnico. **Sync Jobs** acelera la continuación inmediatamente; si guardas una celda amarilla y olvidas usarlo, el siguiente ciclo programado importará ese cambio antes de discovery y continuará de forma autónoma.
+
+Los tipos de atención son `DECISION_REQUIRED`, `REVIEW_REQUIRED`, `ANSWER_REQUIRED`, `APPROVAL_REQUIRED`, `VERIFICATION_REQUIRED`, `FOLLOW_UP_REQUIRED` y `EXTERNAL_ACTION_REQUIRED`. Resume y Cover Letter se abren desde enlaces privados ligados al paquete exacto. Una verificación ambigua sólo acepta `CONFIRMED_APPLIED`, `NOT_APPLIED` o `KEEP_UNKNOWN`; `RETRY` no existe. Contraseñas, MFA, tokens, CAPTCHA y login nunca se guardan ni se evitan.
+
+La ruta oficial/canónica siempre es la aplicación primaria. Outreach es complementario y usa un solo mejor contacto verificado. Gmail se ejecuta desde `jorgeaveraf@gmail.com`; LinkedIn usa el perfil Chrome administrado `Jorge` cuando el flujo es seguro. X/Twitter, Slack, Discord, The Org, contact forms y otras rutas no soportadas se muestran como `MANUAL_OUTREACH_RECOMMENDED`: tú recibes URL, mensaje y timing, pero Career Ops no las ejecuta.
+
+Cuando se confirma `APPLIED`, el trabajo sale de TODAY y entra a APPLICATIONS. Cualquier outreach exacto ya aprobado continúa desde ese contexto. Career Ops detecta replies y vuelve a pedir tu atención, pero V4.3 no mantiene conversaciones ni envía follow-ups nuevos sin otra autorización exacta.
+
+Un **Sync Jobs** o **Sync Communities** exitoso se confirma en la hoja y no genera email. Sync Jobs importa primero todas las ediciones humanas y despierta inmediatamente Enrichment, Application Executor y Outreach Executor según corresponda; el ciclo diario usa exactamente el mismo reconciliador antes de descubrir o reordenar oportunidades. Cada worker conserva cola, wake, claim y resultado en SQLite, tiene un fallback periódico y es vigilado contra colas sin claim por más de 10 segundos. Cada ejecución de Application Enrichment produce como máximo un digest accionable —aunque prepare varios trabajos— y queda silenciosa si nada requiere atención. Una iteración/batch de aplicaciones produce un solo digest consolidado; no se envía un correo por aplicación. Ambigüedades críticas siguen siendo inmediatas porque prohíben reintentos; los incidentes derivados se agrupan bajo una sola causa raíz. El resumen diario continúa separado y se envía una vez al concluir el ciclo real, incluso si no hubo oportunidades nuevas. La operación normal no requiere repo, CLI, logs ni ChatGPT. La guía completa y autoritativa está en la pestaña `README` de la Google Sheet; detalles técnicos: [Autonomous Application Execution](docs/AUTONOMOUS_APPLICATION_EXECUTION.md), [Human Control Plane](docs/HUMAN_CONTROL_PLANE.md), [Execution Orchestration](docs/EXECUTION_ORCHESTRATION.md) y [Operational Intelligence](docs/OPERATIONAL_INTELLIGENCE.md).
+
+**Career Ops → Sync Jobs** y **Sync Communities** siguen siendo las únicas acciones del menú. En operación normal permaneces en la Sheet. Sólo sales para un límite humano o de seguridad real —por ejemplo MFA, CAPTCHA, reautenticación o challenge/restriction— o `MANUAL_OUTREACH_RECOMMENDED` (ruta no soportada con URL + mensaje + timing). Career Ops nunca reintenta submits o deliveries ambiguos, contacta sin `APPROVE_OUTREACH`, interpreta `APPROVE_TO_APPLY` como permiso para mensajear, evade challenges, inventa respuestas, aplica sin autorización exacta ni inicia una cadena de follow-up no aprobada.
+
 ## FAQ
 
 **What is career-ops?**
@@ -456,7 +520,7 @@ career-ops runs on any major AI coding CLI — Claude Code, Codex, Gemini / Anti
 career-ops runs on Windows. If skills fail to load with a symlink error during install, the fix is in [docs/FAQ.md](docs/FAQ.md). Full steps are in [docs/SETUP.md](docs/SETUP.md).
 
 **Does career-ops auto-apply to jobs for me?**
-No. career-ops is a filter, not a spray-and-pray auto-applier. The AI evaluates, ranks and drafts; you review and decide. It never submits, sends, or clicks anything — you always have the final call. That human-in-the-loop design is the whole point.
+Not without an exact approval. career-ops is a filter, not a spray-and-pray auto-applier: it evaluates, ranks and prepares first, and you decide. `APPROVE_TO_APPLY` authorizes Career Ops to submit one specific job, current package and application plan through a native adapter or the Generic Browser Executor; it does not authorize outreach. Unknown real-human facts and security boundaries surface as `WAITING_FOR_YOU` or `BLOCKED`, and `APPLIED` requires observable confirmation. Facebook group joins likewise require an exact `WANT_TO_JOIN`; Career Ops never answers membership questions or accepts rules for you.
 
 **Is career-ops free and open source?**
 Yes. career-ops is free and open source, and for the candidate it always will be — it is the first reference implementation of the [CareerOps Manifesto](https://career-ops.org/manifesto). Read it, and if it says what you believe, sign it.

@@ -165,17 +165,22 @@ try {
     pass('lever.fetch() maps an empty posting object to empty-string fields without crashing');
   else fail(`lever.fetch() row 2 = ${JSON.stringify(fetched[2])}`);
 
-  // Non-array response bodies → [], no crash.
+  // Non-array response bodies are schema failures, not empty boards.
   const emptyCases = [null, {}, { postings: [] }, 'nope'];
   let emptyOk = true;
   for (const body of emptyCases) {
-    const out = await lever.fetch(
-      { name: 'Acme', careers_url: 'https://jobs.lever.co/acme' },
-      { fetchJson: async () => body },
-    );
-    if (!Array.isArray(out) || out.length !== 0) { emptyOk = false; fail(`lever.fetch() body=${JSON.stringify(body)} → ${JSON.stringify(out)}`); break; }
+    try {
+      await lever.fetch(
+        { name: 'Acme', careers_url: 'https://jobs.lever.co/acme' },
+        { fetchJson: async () => body },
+      );
+      emptyOk = false;
+    } catch (error) {
+      if (!/unexpected API response/.test(error.message)) emptyOk = false;
+    }
   }
-  if (emptyOk) pass('lever.fetch() returns [] for non-array response bodies (null / {} / string)');
+  if (emptyOk) pass('lever.fetch() rejects non-array response bodies as schema changes');
+  else fail('lever.fetch() should reject malformed response bodies');
 
   // fetch() — a pinned api: is used verbatim, bypassing careers_url parsing entirely.
   let pinnedUrl = null;
