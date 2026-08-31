@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.31.1](https://github.com/santifer/career-ops/compare/career-ops-v1.31.0...career-ops-v1.31.1) (2026-08-31)
+
+
+### Bug Fixes
+
+* **verify-cv-facts:** bind a count to the nearest metric noun, not the farthest ([#3465](https://github.com/santifer/career-ops/issues/3465)) ([53620d3](https://github.com/santifer/career-ops/commit/53620d3bfaf10652bb8d746c73758ad5cda8fe5c))
+* **web:** a company with no usable slug must not match every tailored CV ([#3214](https://github.com/santifer/career-ops/issues/3214)) ([880c58b](https://github.com/santifer/career-ops/commit/880c58b999033b7f38439f20246943e9342e7fdf))
+* **web:** require the cv- prefix so the tailored-CV resolvers stop returning the cover letter ([#2156](https://github.com/santifer/career-ops/issues/2156)) ([414d340](https://github.com/santifer/career-ops/commit/414d340b4425bf199ddad36dfc0a551da4e99fe0))
+
 ## [1.31.0](https://github.com/santifer/career-ops/compare/career-ops-v1.30.0...career-ops-v1.31.0) (2026-08-31)
 
 

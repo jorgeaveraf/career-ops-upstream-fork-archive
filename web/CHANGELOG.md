@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.1](https://github.com/santifer/career-ops/compare/web-v0.9.0...web-v0.9.1) (2026-08-31)
+
+
+### Bug Fixes
+
+* **web:** a company with no usable slug must not match every tailored CV ([#3214](https://github.com/santifer/career-ops/issues/3214)) ([880c58b](https://github.com/santifer/career-ops/commit/880c58b999033b7f38439f20246943e9342e7fdf))
+* **web:** require the cv- prefix so the tailored-CV resolvers stop returning the cover letter ([#2156](https://github.com/santifer/career-ops/issues/2156)) ([414d340](https://github.com/santifer/career-ops/commit/414d340b4425bf199ddad36dfc0a551da4e99fe0))
+
 ## [0.9.0](https://github.com/santifer/career-ops/compare/web-v0.8.1...web-v0.9.0) (2026-08-31)
 
 
