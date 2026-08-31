@@ -3,17 +3,22 @@ export const NAVIGABLE_RESEARCH_NEEDS = Object.freeze([
   'CONFIRM_EMPLOYMENT_MODEL', 'CONFIRM_COMPENSATION', 'CONFIRM_COMPANY_MARKET',
   'CONFIRM_SCHEDULE', 'RESOLVE_LOCATION_CONFLICT', 'CONFIRM_POSTING_IS_REAL',
 ]);
+export const QUALIFICATION_RESEARCH_NEEDS = Object.freeze(new Set([
+  'FETCH_FULL_DESCRIPTION', 'CONFIRM_MEXICO_ELIGIBILITY', 'CONFIRM_REMOTE_SCOPE',
+  'CONFIRM_EMPLOYMENT_MODEL', 'RESOLVE_LOCATION_CONFLICT', 'CONFIRM_POSTING_IS_REAL',
+]));
 
 const PRIORITY = Object.freeze({ HIGH: 3, MEDIUM: 2, LOW: 1 });
 const completenessCount = value => Object.values(value || {}).filter(item => item?.status === 'COMPLETE').length;
 
 export class PriorityResearchPlanner {
-  constructor({ maxTasks = 5, maxNeedsPerTask = 9 } = {}) { this.maxTasks = maxTasks; this.maxNeedsPerTask = maxNeedsPerTask; }
+  constructor({ maxTasks = 5, maxNeedsPerTask = 9, qualificationOnly = true } = {}) { this.maxTasks = maxTasks; this.maxNeedsPerTask = maxNeedsPerTask; this.qualificationOnly = qualificationOnly; }
   plan({ needs = [], candidates = [], snapshot = [] } = {}) {
     const candidateByJob = new Map(candidates.map(item => [item.jobId, item]));
     const snapshotByJob = new Map(snapshot.map(item => [item.jobId, item]));
     const grouped = new Map();
-    for (const need of needs.filter(item => item.status === 'OPEN' && NAVIGABLE_RESEARCH_NEEDS.includes(item.type))) {
+    for (const need of needs.filter(item => item.status === 'OPEN' && NAVIGABLE_RESEARCH_NEEDS.includes(item.type)
+      && (!this.qualificationOnly || QUALIFICATION_RESEARCH_NEEDS.has(item.type)))) {
       const candidate = candidateByJob.get(need.jobId); if (!candidate) continue;
       const current = grouped.get(need.jobId) || { candidate, needs: [], snapshot: snapshotByJob.get(need.jobId) || null };
       current.needs.push(need); grouped.set(need.jobId, current);

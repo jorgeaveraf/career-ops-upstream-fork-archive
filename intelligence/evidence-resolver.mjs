@@ -69,9 +69,15 @@ export function resolveGeography(job, policy) {
   const remote = [];
   for (const [field, text, source, evidenceConfidence] of fields) {
     if (!text) continue;
-    const positiveHit = phrase(text.replace(/\bnew mexico\b/g, ''), positivePhrases);
+    let positiveHit = phrase(text.replace(/\bnew mexico\b/g, ''), positivePhrases);
+    if (field === 'description' && normalizeEvidenceText(positiveHit) === 'worldwide'
+        && !/(?:role|position|job|opening|hiring|candidate|applicant|eligible|available|remote)[^.]{0,80}\bworldwide\b|\bworldwide\b[^.]{0,80}(?:role|position|job|opening|hiring|candidate|applicant|eligible|available|remote)/.test(text)) positiveHit = '';
+    const scopedAnywhere = text.match(/\banywhere in (?!the world\b|mexico\b|lat(?:in america|am)\b)(?:the )?([a-z ]{2,40}?)(?:\.|,|$)/)?.[0] || '';
+    if (scopedAnywhere && normalizeEvidenceText(positiveHit) === 'anywhere') positiveHit = '';
     const residencyMatch = text.match(/\bmust (?:reside|be located|be based) in (?!mexico\b)(?:the )?([a-z ]{2,40}?)(?:\.|,|$)/)?.[0] || '';
-    const negativeHit = phrase(text, negativePhrases) || residencyMatch;
+    const explicitForeignLocation = field === 'location'
+      && !phrase(text, [...positivePhrases, 'remote', 'work from home', 'desde casa']) ? text : '';
+    const negativeHit = phrase(text, negativePhrases) || scopedAnywhere || residencyMatch || explicitForeignLocation;
     const remoteHit = phrase(text, ['remote', 'distributed', 'work from home', 'desde casa']);
     if (positiveHit) {
       const normalizedHit = normalizeEvidenceText(positiveHit);

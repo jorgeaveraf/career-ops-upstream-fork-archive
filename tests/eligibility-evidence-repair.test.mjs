@@ -58,6 +58,16 @@ test('Worldwide is positive but worldwide plus US residency is a conflict', () =
   assert.ok(conflict.researchNeeds.some(item => item.type === 'RESOLVE_LOCATION_CONFLICT'));
 });
 
+test('country-scoped anywhere and explicit foreign locations are not worldwide eligibility', () => {
+  const sweden=evaluateEligibility(job({location:'Sweden',description:'This remote-first role can be executed from anywhere in Sweden.'}),policy);
+  assert.equal(sweden.status,'INELIGIBLE');
+  assert.ok(sweden.rulesApplied.includes('location.country_lock'));
+  const contaminated=evaluateEligibility(job({location:'Sri Lanka',description:'Sri Lanka only. Related jobs: LATAM Software Engineer.'}),policy);
+  assert.notEqual(contaminated.status,'ELIGIBLE');
+  const marketing=evaluateEligibility(job({location:'Warszawa, Poland',description:'We deliver meals to millions of households worldwide. Work with our team in Warsaw.'}),policy);
+  assert.equal(marketing.status,'INELIGIBLE');
+});
+
 test('missing compensation does not degrade evidenced geographic eligibility', () => {
   const result = evaluateEligibility(job({ salary: null }), policy);
   assert.equal(result.status, 'ELIGIBLE');
@@ -125,5 +135,33 @@ test('resolving a persisted need queues only that candidate for reassessment', (
     assert.equal(queue.length, 1);
     assert.equal(queue[0].jobId, observed.jobId);
     assert.equal(registry.listCandidateResearchNeeds({ status: 'RESOLVED' }).length, 1);
+  } finally { registry.close(); }
+});
+
+test('research reconciliation obsoletes prior-assessment noise but preserves the canonical need', () => {
+  const registry = new JobRegistry({ dbPath: ':memory:', clock: () => new Date(NOW) });
+  try {
+    registry.startRun({ id: 'reconcile-run', type: 'fixture', startedAt: NOW });
+    const observed = registry.recordObservation('reconcile-run', { provider: 'fixture', externalId: 'reconcile',
+      sourceUrl: 'https://example.test/reconcile', retrievedAt: NOW, ...job({ location: 'Remote' }) });
+    registry.recordCandidateSelection('reconcile-run', { rulesVersion:'1',policyHash:policy.policyHash,capacity:1,threshold:0,fillToCapacity:false,
+      counts:{raw:1,PASS:1,REJECT:0,UNKNOWN:0,active:1},decisions:[],transitions:[],activeCandidates:[{jobId:observed.jobId,observationId:observed.observationId,
+        state:'ACTIVE',stateReason:'fixture',preliminaryScore:90,freshnessDays:0,source:'fixture',sourceKey:'fixture',previousRank:null,selectionRank:1}] });
+    const candidate={...job({location:'Remote'}),jobId:observed.jobId,observationId:observed.observationId};
+    const first=registry.recordAssessment(observed.jobId,observed.observationId,assessOpportunity(candidate,policy,{calculatedAt:NOW}));
+    const versions={unifiedPolicyVersion:'1',eligibilityRulesVersion:'2',completenessVersion:'1',researchNeedsVersion:'1'};
+    registry.syncCandidateResearchNeeds({selectionRunId:'reconcile-run',assessmentId:first.id,jobId:observed.jobId,observationId:observed.observationId,
+      needs:first.result.eligibility.researchNeeds,versions,policyHash:policy.policyHash});
+    const later='2026-08-24T18:01:00.000Z';
+    const secondObserved=registry.recordObservation('reconcile-run',{provider:'fixture',externalId:'reconcile',sourceUrl:'https://example.test/reconcile',retrievedAt:later,
+      ...job({location:'Remote',description:`${candidate.description} Additional normalized evidence.`})});
+    const secondCandidate={...candidate,observationId:secondObserved.observationId,description:`${candidate.description} Additional normalized evidence.`};
+    const second=registry.recordAssessment(observed.jobId,secondObserved.observationId,assessOpportunity(secondCandidate,policy,{calculatedAt:later}));
+    registry.syncCandidateResearchNeeds({selectionRunId:'reconcile-run',assessmentId:second.id,jobId:observed.jobId,observationId:secondObserved.observationId,
+      needs:second.result.eligibility.researchNeeds,versions:{...versions,researchNeedsVersion:'2'},policyHash:policy.policyHash});
+    const result=registry.reconcileCandidateResearchNeeds({reconciledAt:later});
+    assert.ok(result.reconciled>0);
+    assert.ok(registry.listCandidateResearchNeeds({status:'OPEN'}).every(item=>item.assessmentId===second.id));
+    assert.ok(registry.listCandidateResearchNeeds({status:'OBSOLETE'}).some(item=>item.assessmentId===first.id));
   } finally { registry.close(); }
 });

@@ -7,6 +7,13 @@ import { EVIDENCE_COMPLETENESS_VERSION, RESEARCH_NEEDS_VERSION, UNIFIED_CANDIDAT
 import { browserRunbookForTask } from './source-runbooks.mjs';
 import { evidenceResolvesNeed, extractCandidateEvidence, validateCandidateIdentity } from './enrichment-evidence.mjs';
 import { PriorityResearchPlanner } from './priority-research-planner.mjs';
+import { selectPipelineAdmission } from '../intelligence/pipeline-admission.mjs';
+import { isQualificationBlockingResearch } from '../intelligence/qualification-backlog.mjs';
+
+export function partitionResearchEvidence(needs = [], evidence = []) {
+  return { resolved: needs.filter(need => evidenceResolvesNeed(need, evidence)),
+    unsupported: needs.filter(need => !evidenceResolvesNeed(need, evidence)) };
+}
 
 export function reassessResolvedCandidates({ registry, runId, jobIds, policy, selectionPolicy, clock = () => new Date() }) {
   const scope = new Set(jobIds); let reassessed = 0;
@@ -34,7 +41,11 @@ export async function runBrowserEnrichment({ registry, sessionManager, selection
   if (!registry || !sessionManager || (!selection && !selectionResolver) || !browserAdapter) throw new TypeError('Browser Enrichment dependencies are required');
   const startedAt = clock().toISOString(); registry.startRun({ id: runId, type: 'browser-enrichment', startedAt, metadata: { mode: 'ENRICHMENT', researchOnly: true } });
   const operational = registry.getOperationalCandidateData(); const candidates = registry.listCandidateSelectionInputs();
-  const tasks = new PriorityResearchPlanner({ maxTasks }).plan({ needs: operational.researchNeeds, candidates, snapshot: operational.snapshot });
+  const activeIds = new Set(operational.activeCandidates.map(item => item.jobId));
+  const admission = selectPipelineAdmission(registry.getControlPlaneData({ candidateScope: 'active', includeAttention: false }));
+  const traceByJob = new Map(admission.trace.map(item => [item.jobId, item]));
+  const tasks = new PriorityResearchPlanner({ maxTasks }).plan({ needs: operational.researchNeeds.filter(item => activeIds.has(item.jobId)
+    && isQualificationBlockingResearch(item, traceByJob.get(item.jobId))), candidates, snapshot: operational.snapshot });
   let session; const results = []; const before = Object.fromEntries(['ELIGIBLE','UNKNOWN','INELIGIBLE'].map(status => [status, registry.getLatestAssessmentsForJobs(operational.activeCandidates.map(item => item.jobId)).filter(item => item.eligibilityStatus === status).length]));
   try {
     session = await sessionManager.acquire(selection || selectionResolver()); await browserAdapter.start?.(session);
@@ -67,7 +78,11 @@ export async function runBrowserEnrichment({ registry, sessionManager, selection
           schedule: evidence.find(item => item.field === 'schedule')?.value },
       });
       let resolved = 0;
-      for (const need of task.needs) if (evidenceResolvesNeed(need, evidence)) { registry.resolveCandidateResearchNeed(need.id, { evidence, resolvedAt: semantic.telemetry.finishedAt }); resolved++; }
+      const partition = partitionResearchEvidence(task.needs, evidence);
+      for (const need of partition.resolved) { registry.resolveCandidateResearchNeed(need.id, { evidence, resolvedAt: semantic.telemetry.finishedAt }); resolved++; }
+      for (const need of partition.unsupported) registry.blockCandidateResearchNeed(need.id, {
+        reason: 'INSUFFICIENT_CANONICAL_EVIDENCE', evidence: [{ sourceUrl: task.url, inspectedAt: semantic.telemetry.finishedAt }],
+      });
       results.push({ taskId: task.id, jobId: task.jobId, outcome: semantic.outcome, identity, evidence: evidence.length, observation, resolved }); onTask?.(results.at(-1));
     }
     const policy = loadOpportunityPolicy({ profilePath, portalsPath }); const selectionPolicy = loadCandidateSelectionPolicy({ profilePath, portalsPath });

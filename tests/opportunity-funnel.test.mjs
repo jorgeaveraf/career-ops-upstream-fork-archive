@@ -5,6 +5,7 @@ import { createOpportunityPolicy } from '../intelligence/profile-policy.mjs';
 import { evaluateEligibility } from '../intelligence/eligibility-engine.mjs';
 import { assessOpportunity } from '../intelligence/funnel.mjs';
 import { JobRegistry } from '../registry/job-registry.mjs';
+import { ELIGIBILITY_RULES_VERSION } from '../intelligence/contracts.mjs';
 
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/opportunity-funnel.json', import.meta.url), 'utf8'));
 const policy = createOpportunityPolicy(fixture.profile, fixture.portals);
@@ -125,7 +126,7 @@ test('assessment candidates include unassessed run observations and skip current
       rawMetadata: { salary: { min: 50, max: 75, currency: 'USD', period: 'hour' } },
     });
     registry.finishRun('candidate-run', { finishedAt: NOW });
-    const query = { eligibilityRulesVersion: '2', rankingRulesVersion: '4', profileHash: policy.profileHash, runId: 'candidate-run' };
+    const query = { eligibilityRulesVersion: ELIGIBILITY_RULES_VERSION, rankingRulesVersion: '4', profileHash: policy.profileHash, runId: 'candidate-run' };
     const candidates = registry.listAssessmentCandidates(query);
     assert.equal(candidates.length, 1);
     assert.equal(candidates[0].salary.min, 50);

@@ -2,9 +2,10 @@ import { openCandidateKnowledge } from '../candidate-knowledge/provider.mjs';
 import { DeepEvaluationEngine } from '../deep-evaluation/engine.mjs';
 import { selectPipelineAdmission } from '../intelligence/pipeline-admission.mjs';
 import { summarizeQualificationBacklog } from '../intelligence/qualification-backlog.mjs';
+import { runEligibilityEvidenceRepair } from './eligibility-evidence-repair.mjs';
 
 export const QUALIFICATION_ORCHESTRATOR_VERSION = '4.8.0';
-export const DEFAULT_QUALIFICATION_BUDGET = Object.freeze({ evaluations: 10, runtimeMs: 120_000 });
+export const DEFAULT_QUALIFICATION_BUDGET = Object.freeze({ evaluations: 100, runtimeMs: 600_000 });
 
 /** Bounded cheap-to-expensive drain. Eligibility assessment remains in the
  * ranking stage; this stage advances only current SHORTLIST rows lacking the
@@ -12,7 +13,8 @@ export const DEFAULT_QUALIFICATION_BUDGET = Object.freeze({ evaluations: 10, run
  * started implicitly. */
 export async function drainQualificationBacklog({
   registry, projectRoot = process.cwd(), candidateProvider = null, clock = () => new Date(),
-  budget = DEFAULT_QUALIFICATION_BUDGET,
+  budget = DEFAULT_QUALIFICATION_BUDGET, fullActivePass = false, reconcileResearch = true,
+  eligibilityStage = runEligibilityEvidenceRepair,
 } = {}) {
   if (!registry) throw new TypeError('registry is required');
   const startedAt = clock().toISOString();
@@ -21,6 +23,9 @@ export async function drainQualificationBacklog({
   const runtimeMs = Math.max(1_000, Math.min(15 * 60_000, Number(budget.runtimeMs) || 120_000));
   const provider = candidateProvider || openCandidateKnowledge({ projectRoot });
   const engine = new DeepEvaluationEngine({ candidateProvider: provider, clock });
+  const eligibility = fullActivePass ? await eligibilityStage({ registry, clock }) : null;
+  const researchReconciliation = reconcileResearch && typeof registry.reconcileCandidateResearchNeeds === 'function'
+    ? registry.reconcileCandidateResearchNeeds({ reconciledAt: clock().toISOString() }) : null;
   const considered = [], evaluations = [];
   let existing = 0, runtimeExhausted = false;
   for (const selected of registry.listDeepEvaluationCandidates({ limit: 1000 })) {
@@ -44,6 +49,6 @@ export async function drainQualificationBacklog({
     doNotApply: evaluations.filter(item => item.status === 'VALID' && item.recommendation === 'DO_NOT_APPLY').length,
     consider: evaluations.filter(item => item.status === 'VALID' && item.recommendation === 'CONSIDER').length,
     runtimeExhausted, evaluations: Object.freeze(evaluations), strongPoolCount: strongPool.admitted.length, backlog,
-    expensiveResearchStarted: 0,
+    eligibility, researchReconciliation, expensiveResearchStarted: 0,
   });
 }

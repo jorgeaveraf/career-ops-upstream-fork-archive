@@ -5,6 +5,8 @@ import { selectTodayMembership, TODAY_REFILL_OUTCOMES } from '../human-control-p
 import { buildInfrastructureVisibilityRequests } from '../human-control-plane/sheet-ux.mjs';
 import { drainQualificationBacklog } from '../automation/qualification-orchestrator.mjs';
 import { openCandidateKnowledge } from '../candidate-knowledge/provider.mjs';
+import { summarizeQualificationBacklog } from '../intelligence/qualification-backlog.mjs';
+import { analyzeQualificationClosure } from '../intelligence/qualification-closure.mjs';
 
 const NOW = '2026-08-31T18:00:00.000Z';
 function strongData(count = 12, { research = [] } = {}) {
@@ -49,4 +51,51 @@ test('qualification drain advances a bounded batch and starts no expensive resea
   };
   const result=await drainQualificationBacklog({registry,candidateProvider,clock:()=>new Date(NOW),budget:{evaluations:2,runtimeMs:120000}});
   assert.equal(result.completed,2);assert.equal(stored.length,2);assert.equal(result.expensiveResearchStarted,0);
+});
+
+test('scheduled drain reintroduces backlog and completes new eligibility work in the same cycle', async () => {
+  const calls=[];
+  const candidate={job:{id:'job-new',jobId:'job-new',observationId:'obs-new',company:'Acme',title:'Senior AI Engineer',location:'Remote Mexico',description:'Build production AI platforms using JavaScript, cloud systems, APIs, and engineering leadership. '.repeat(8),sourceUrl:'https://example.test/new',canonicalUrl:'https://example.test/new',rawMetadata:{}},assessment:{id:'assessment-new',jobId:'job-new',observationId:'obs-new',decision:'SHORTLIST',eligibilityStatus:'ELIGIBLE',candidateFitScore:90,opportunityScore:85,finalPriorityScore:90}};
+  const stored=[];
+  const registry={
+    listDeepEvaluationCandidates:()=>calls.length ? [candidate] : [],
+    recordJobEvaluation:artifact=>{stored.push(artifact);return artifact;},
+    reconcileCandidateResearchNeeds:()=>({considered:0,reconciled:0}),
+    getControlPlaneData:()=>({jobs:[],humanState:[],applicationExecutions:[],candidateSelection:{researchNeeds:[],reassessmentQueue:[]}}),
+  };
+  const result=await drainQualificationBacklog({registry,fullActivePass:true,candidateProvider:openCandidateKnowledge({projectRoot:process.cwd()}),clock:()=>new Date(NOW),eligibilityStage:async()=>{calls.push('eligibility');return {assessed:1};}});
+  assert.deepEqual(calls,['eligibility']);assert.equal(result.completed,1);assert.equal(stored.length,1);
+});
+
+test('backlog ignores stale research and separates runnable work from external blocks', () => {
+  const data=strongData(2,{research:[
+    {jobId:'job-0',assessmentId:'current-0',type:'CONFIRM_MEXICO_ELIGIBILITY',status:'OPEN',createdAt:NOW},
+    {jobId:'job-0',assessmentId:'old-0',type:'CONFIRM_MEXICO_ELIGIBILITY',status:'OPEN',createdAt:NOW},
+    {jobId:'job-1',assessmentId:'current-1',type:'FETCH_FULL_DESCRIPTION',status:'BLOCKED',createdAt:NOW},
+    {jobId:'job-1',assessmentId:'current-1',type:'CONFIRM_COMPENSATION',status:'OPEN',createdAt:NOW},
+  ]});
+  data.jobs[0].assessment.id='current-0';data.jobs[1].assessment.id='current-1';
+  data.jobs[0].assessment.eligibilityStatus='UNKNOWN';
+  const admission={trace:[{jobId:'job-0',exactRule:'ELIGIBILITY_NOT_RESOLVED'},{jobId:'job-1',exactRule:'INSUFFICIENT_EVIDENCE'}]};
+  const backlog=summarizeQualificationBacklog(data,admission,{now:new Date(NOW)});
+  assert.equal(backlog.researchPending,3);assert.equal(backlog.activeBlockingResearch,2);
+  assert.equal(backlog.runnableBlockingResearch,1);assert.equal(backlog.externallyBlockedResearch,1);
+  const closure=analyzeQualificationClosure(data,admission);
+  assert.equal(closure.research.staleOrDuplicate,1);assert.equal(closure.research.nonBlocking,1);
+  assert.equal(closure.eligibility.counts.C_NEEDS_PUBLIC_EVIDENCE_RESEARCH,1);
+});
+
+test('under-target TODAY reports an external boundary instead of endless internal processing', () => {
+  const data=strongData(5,{research:[{jobId:'job-4',assessmentId:'current-4',type:'CONFIRM_MEXICO_ELIGIBILITY',status:'BLOCKED',createdAt:NOW}]});
+  data.jobs[4].assessment.id='current-4';data.jobs[4].assessment.eligibilityStatus='UNKNOWN';data.jobs[4].evaluation=null;data.candidateSelection.snapshot[4].eligibilityStatus='UNKNOWN';
+  const result=selectTodayMembership(data);
+  assert.equal(result.outcome,TODAY_REFILL_OUTCOMES.BLOCKED);
+  assert.equal(result.diagnostics.exhaustionResult,'QUALIFICATION_EXTERNALLY_BLOCKED');
+  assert.equal(result.diagnostics.qualificationBacklog.runnableInternalCandidates,0);
+});
+
+test('an unresolved geographic assessment with exhausted evidence is ambiguous, not orphan work', () => {
+  const data=strongData(1);data.jobs[0].assessment.eligibilityStatus='UNKNOWN';data.jobs[0].assessment.rulesApplied=['location.unproven'];data.candidateSelection.snapshot[0].eligibilityStatus='UNKNOWN';
+  const closure=analyzeQualificationClosure(data,{trace:[{jobId:'job-0',exactRule:'ELIGIBILITY_NOT_RESOLVED'}]});
+  assert.deepEqual(closure.eligibility.counts,{F_GENUINELY_AMBIGUOUS:1});
 });

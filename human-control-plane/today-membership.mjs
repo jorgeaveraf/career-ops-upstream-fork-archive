@@ -77,8 +77,10 @@ export function selectTodayMembership(data = {}, { capacity = TODAY_TARGET, pipe
   const backlog = summarizeQualificationBacklog(data, pipelineSelection);
   const underTarget = pipelineSelection.admitted.length < target;
   const strongPoolExhausted = underTarget && backlog.exhausted;
+  const externallyBounded = underTarget && backlog.status === 'DEGRADED_EXTERNAL';
   const outcome = !underTarget ? TODAY_REFILL_OUTCOMES.FILLED
-    : strongPoolExhausted ? TODAY_REFILL_OUTCOMES.EXHAUSTED : TODAY_REFILL_OUTCOMES.PROCESSING;
+    : strongPoolExhausted ? TODAY_REFILL_OUTCOMES.EXHAUSTED
+      : externallyBounded ? TODAY_REFILL_OUTCOMES.BLOCKED : TODAY_REFILL_OUTCOMES.PROCESSING;
   const trace = [
     ...curated.map(value => Object.freeze({ jobId: value.jobId, company: value.item.job.company, role: value.item.job.title,
       pipelineRank: value.pipelineRank, result: 'ADMITTED', admissionReason: value.admissionReason, exactRule: value.admissionDetail })),
@@ -100,7 +102,8 @@ export function selectTodayMembership(data = {}, { capacity = TODAY_TARGET, pipe
     blockedCandidates: Object.freeze([]), admissibleRemainder: Math.max(0, pipelineSelection.admitted.length - curated.length),
     qualificationBacklog: backlog,
     exhaustionResult: strongPoolExhausted ? 'STRONG_POOL_EXHAUSTED'
-      : underTarget ? 'QUALIFICATION_BACKLOG_PROCESSING' : null,
+      : externallyBounded ? 'QUALIFICATION_EXTERNALLY_BLOCKED'
+        : underTarget ? 'QUALIFICATION_BACKLOG_PROCESSING' : null,
     trace: Object.freeze(trace),
   });
   return Object.freeze({

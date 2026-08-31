@@ -50,17 +50,32 @@ function readDatabaseHealth(dbPath, nowMs = Date.now()) {
           (SELECT a.id FROM job_assessments a WHERE a.job_id=ac.job_id ORDER BY a.assessed_at DESC,a.rowid DESC LIMIT 1) assessment_id,
           (SELECT a.eligibility_status FROM job_assessments a WHERE a.job_id=ac.job_id ORDER BY a.assessed_at DESC,a.rowid DESC LIMIT 1) eligibility_status,
           (SELECT a.decision FROM job_assessments a WHERE a.job_id=ac.job_id ORDER BY a.assessed_at DESC,a.rowid DESC LIMIT 1) decision,
+          (SELECT e.recommendation FROM job_evaluations e JOIN job_assessments a ON a.id=e.assessment_id WHERE a.job_id=ac.job_id ORDER BY e.evaluated_at DESC,e.rowid DESC LIMIT 1) recommendation,
           (SELECT a.assessed_at FROM job_assessments a WHERE a.job_id=ac.job_id ORDER BY a.assessed_at DESC,a.rowid DESC LIMIT 1) assessed_at
         FROM active_candidates ac WHERE ac.state IN ('ACTIVE','CARRYOVER')
+      ), current_research AS (
+        SELECT n.* FROM candidate_research_needs n JOIN latest l ON l.job_id=n.job_id AND l.assessment_id=n.assessment_id
+        WHERE n.status IN ('OPEN','BLOCKED')
+      ), blocking_research AS (
+        SELECT n.* FROM current_research n JOIN latest l ON l.job_id=n.job_id WHERE
+          ((l.eligibility_status IS NULL OR l.eligibility_status='UNKNOWN') AND n.need_type IN (
+            'FETCH_FULL_DESCRIPTION','CONFIRM_MEXICO_ELIGIBILITY','CONFIRM_REMOTE_SCOPE',
+            'RESOLVE_LOCATION_CONFLICT','CONFIRM_POSTING_STATUS','CONFIRM_POSTING_IS_REAL'
+          )) OR (l.eligibility_status='ELIGIBLE' AND l.decision='SHORTLIST' AND l.recommendation='APPLY' AND n.need_type IN (
+            'FETCH_FULL_DESCRIPTION','CONFIRM_MEXICO_ELIGIBILITY','CONFIRM_REMOTE_SCOPE',
+            'CONFIRM_EMPLOYMENT_MODEL','RESOLVE_LOCATION_CONFLICT','CONFIRM_POSTING_STATUS','CONFIRM_POSTING_IS_REAL'
+          ))
       ), pending AS (
         SELECT job_id,assessed_at pending_at FROM latest WHERE eligibility_status IS NULL OR eligibility_status='UNKNOWN'
         UNION SELECT l.job_id,l.assessed_at FROM latest l WHERE l.decision='SHORTLIST' AND NOT EXISTS(SELECT 1 FROM job_evaluations e WHERE e.assessment_id=l.assessment_id)
-        UNION SELECT n.job_id,n.created_at FROM candidate_research_needs n JOIN latest l ON l.job_id=n.job_id WHERE n.status IN ('OPEN','BLOCKED')
+        UNION SELECT job_id,created_at FROM blocking_research
       )
       SELECT (SELECT COUNT(*) FROM latest) active_count,
         (SELECT COUNT(*) FROM latest WHERE eligibility_status IS NULL OR eligibility_status='UNKNOWN') eligibility_pending,
         (SELECT COUNT(*) FROM latest l WHERE l.decision='SHORTLIST' AND NOT EXISTS(SELECT 1 FROM job_evaluations e WHERE e.assessment_id=l.assessment_id)) evaluation_pending,
-        (SELECT COUNT(*) FROM candidate_research_needs n JOIN latest l ON l.job_id=n.job_id WHERE n.status IN ('OPEN','BLOCKED')) research_pending,
+        (SELECT COUNT(*) FROM current_research) research_pending,
+        (SELECT COUNT(*) FROM blocking_research WHERE status='OPEN') runnable_blocking_research,
+        (SELECT COUNT(*) FROM blocking_research WHERE status='BLOCKED') externally_blocked_research,
         COUNT(DISTINCT job_id) pending_candidates,MIN(pending_at) oldest_pending_at,
         (SELECT MAX(evaluated_at) FROM job_evaluations) last_evaluation_at
       FROM pending`).get();
@@ -74,7 +89,7 @@ function readDatabaseHealth(dbPath, nowMs = Date.now()) {
         check('Last successful sync', latestSync ? 'OK' : 'WARN', latestSync || 'No successful push recorded'),
         check('Last notification', ['FAILED','AMBIGUOUS'].includes(latestNotification?.status) ? 'WARN' : 'OK', latestNotification ? `${latestNotification.status} at ${latestNotification.last_attempt_at||latestNotification.created_at}` : 'No notification recorded'),
         check('Operational intelligence', operationalSummary?.overall==='ATTENTION'?'WARN':operationalSummary?.overall==='DEGRADED'?'WARN':'OK', operationalSummary?`${operationalSummary.overall} · ${operationalSummary.openSignals} open issue(s)`:'Not initialized'),
-        check('Qualification Engine', qualification.pending_candidates && qualification.oldest_pending_at && nowMs-Date.parse(qualification.oldest_pending_at)>72*3600000?'WARN':'OK', `${qualification.pending_candidates||0} pending candidate(s) · eligibility ${qualification.eligibility_pending||0} · research ${qualification.research_pending||0} · oldest ${qualification.oldest_pending_at||'NONE'}`),
+        check('Qualification Engine', qualification.runnable_blocking_research && qualification.oldest_pending_at && nowMs-Date.parse(qualification.oldest_pending_at)>72*3600000?'WARN':'OK', `${qualification.pending_candidates||0} pending candidate(s) · eligibility ${qualification.eligibility_pending||0} · runnable ${qualification.runnable_blocking_research||0} · external boundaries ${qualification.externally_blocked_research||0} · oldest ${qualification.oldest_pending_at||'NONE'}`),
         check('Evaluation Engine', qualification.evaluation_pending && (!qualification.last_evaluation_at||nowMs-Date.parse(qualification.last_evaluation_at)>72*3600000)?'WARN':'OK', `${qualification.evaluation_pending||0} pending · last success ${qualification.last_evaluation_at||'NONE'} · deterministic bounded drain`),
       ],
       facts: { latestOperationalRun: latestOperational || null, latestSuccessfulSyncAt: latestSync, latestNotification: latestNotification || null, notificationCounts:Object.fromEntries(notificationCounts.map(x=>[x.status,x.count])), workflowEventCount:eventCount, workerQueues, handoffRegistry:Boolean(handoffRegistry),handoffCounts,questionResolutionRegistry:Boolean(questionResolutionRegistry),questionResolutionCount, qualification, operationalSummary, pendingHumanActions: packageActions + reviewActions + applicationActions + pendingFollowUps + contactActions },

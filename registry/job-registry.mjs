@@ -2146,6 +2146,26 @@ export class JobRegistry {
       .all(state, state, jobId, jobId, observationId, observationId, bounded).map(row => this._candidateResearchNeedRow(row));
   }
 
+  reconcileCandidateResearchNeeds({ activeOnly = true, reconciledAt = this.now() } = {}) {
+    const at = iso(reconciledAt, 'reconciledAt');
+    const scope = activeOnly ? "AND ac.state IN ('ACTIVE', 'CARRYOVER')" : '';
+    const stale = this.db.prepare(`
+      SELECT rn.id
+      FROM candidate_research_needs rn
+      JOIN active_candidates ac ON ac.job_id = rn.job_id
+      WHERE rn.status IN ('OPEN', 'BLOCKED') ${scope}
+        AND rn.assessment_id != (
+          SELECT latest.id FROM job_assessments latest
+          WHERE latest.job_id = rn.job_id
+          ORDER BY latest.assessed_at DESC, latest.rowid DESC LIMIT 1
+        )
+      ORDER BY rn.created_at, rn.id
+    `).all();
+    const update = this.db.prepare("UPDATE candidate_research_needs SET status='OBSOLETE', updated_at=? WHERE id=? AND status IN ('OPEN','BLOCKED')");
+    const reconciled = this.db.transaction(() => stale.reduce((count, row) => count + update.run(at, row.id).changes, 0))();
+    return { considered: stale.length, reconciled, activeOnly, reconciledAt: at };
+  }
+
   resolveCandidateResearchNeed(id, { evidence: resolutionEvidence = [], resolvedAt = this.now() } = {}) {
     const needId = requiredText(id, 'research need id');
     const row = this.db.prepare('SELECT * FROM candidate_research_needs WHERE id = ?').get(needId);

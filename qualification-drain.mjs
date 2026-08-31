@@ -7,7 +7,8 @@ const registry = openJobRegistry();
 try {
   const result = await drainQualificationBacklog({
     registry,
-    budget: { evaluations: numberFlag('--evaluations', 10), runtimeMs: numberFlag('--runtime-ms', 120_000) },
+    fullActivePass: process.argv.includes('--full-active-pass'),
+    budget: { evaluations: numberFlag('--evaluations', 100), runtimeMs: numberFlag('--runtime-ms', 600_000) },
   });
   const { evaluations: _evaluations, ...summary } = result;
   console.log(JSON.stringify(summary, null, 2));

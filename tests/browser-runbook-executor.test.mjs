@@ -7,7 +7,7 @@ import { evidenceResolvesNeed, extractCandidateEvidence, validateCandidateIdenti
 import { JobRegistry } from '../registry/job-registry.mjs';
 import { createOpportunityPolicy } from '../intelligence/profile-policy.mjs';
 import { assessOpportunity } from '../intelligence/funnel.mjs';
-import { reassessResolvedCandidates } from '../research/enrichment-runner.mjs';
+import { partitionResearchEvidence, reassessResolvedCandidates } from '../research/enrichment-runner.mjs';
 
 const START = Date.parse('2026-08-24T20:00:00.000Z');
 const record = (id, extra = {}) => ({ externalId: id, url: `https://www.linkedin.com/jobs/view/${id}`, title: `AI Engineer ${id}`, company: 'Acme', ...extra });
@@ -90,6 +90,7 @@ test('PriorityResearchPlanner puts TOP and high-priority evidence needs first', 
   const candidates = [{ jobId: 'a', observationId: 'oa', sourceUrl: 'https://example.test/a', title: 'A', company: 'A' }, { jobId: 'b', observationId: 'ob', sourceUrl: 'https://example.test/b', title: 'B', company: 'B' }];
   const tasks = new PriorityResearchPlanner({ maxTasks: 2 }).plan({ needs, candidates, snapshot: [{ jobId: 'b', isTop10: true, rank: 1, finalPriorityScore: 80 }] });
   assert.equal(tasks[0].jobId, 'b'); assert.equal(tasks[0].needs[0].type, 'FETCH_FULL_DESCRIPTION');
+  assert.equal(tasks.some(item=>item.jobId==='a'),false);
 });
 
 test('candidate identity mismatch is rejected and extracted evidence resolves only supported needs', () => {
@@ -99,6 +100,13 @@ test('candidate identity mismatch is rejected and extracted evidence resolves on
   assert.equal(evidenceResolvesNeed({ type: 'FETCH_FULL_DESCRIPTION' }, evidence), true);
   assert.equal(evidenceResolvesNeed({ type: 'CONFIRM_MEXICO_ELIGIBILITY' }, evidence), true);
   assert.ok(evidence.every(item => item.sourceUrl && item.retrievedAt && item.resolverVersion));
+});
+
+test('a successfully inspected canonical source explicitly blocks fields it does not evidence', () => {
+  const needs=[{id:'geo',type:'CONFIRM_MEXICO_ELIGIBILITY'},{id:'comp',type:'CONFIRM_COMPENSATION'}];
+  const result=partitionResearchEvidence(needs,[{field:'eligibleCountries',value:['Mexico']}]);
+  assert.deepEqual(result.resolved.map(item=>item.id),['geo']);
+  assert.deepEqual(result.unsupported.map(item=>item.id),['comp']);
 });
 
 test('semantic task telemetry and per-pass observations persist separately from provider ROI', () => {

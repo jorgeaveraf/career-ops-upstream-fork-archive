@@ -1,4 +1,4 @@
-export const ELIGIBILITY_RULES_VERSION = '2';
+export const ELIGIBILITY_RULES_VERSION = '4';
 export const RANKING_RULES_VERSION = '4';
 
 export const ELIGIBILITY_STATUSES = Object.freeze(['ELIGIBLE', 'INELIGIBLE', 'UNKNOWN']);

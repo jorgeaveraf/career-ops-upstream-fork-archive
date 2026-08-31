@@ -223,6 +223,7 @@ const SYSTEM_PATHS = [
   'notification-worker.mjs',
   'notifications/',
   'operational-intelligence/',
+  'qualification-drain.mjs',
   'operational-watch-launch-agent.mjs',
   'operational-watch.mjs',
   'ops.mjs',
