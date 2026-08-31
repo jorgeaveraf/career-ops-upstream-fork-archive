@@ -1,4 +1,5 @@
 import { selectPipelineAdmission } from '../intelligence/pipeline-admission.mjs';
+import { summarizeQualificationBacklog } from '../intelligence/qualification-backlog.mjs';
 
 export const TODAY_TARGET = 10;
 export const TODAY_ACTIVE_CAPACITY = TODAY_TARGET;
@@ -11,7 +12,7 @@ export const TODAY_ADMISSION_REASONS = Object.freeze({
   HELD_VISIBLE: 'HUMAN_CARRYOVER',
 });
 
-export const TODAY_REFILL_OUTCOMES = Object.freeze({ FILLED: 'FILLED', EXHAUSTED: 'EXHAUSTED', BLOCKED: 'BLOCKED' });
+export const TODAY_REFILL_OUTCOMES = Object.freeze({ FILLED: 'FILLED', EXHAUSTED: 'EXHAUSTED', PROCESSING: 'PROCESSING', BLOCKED: 'BLOCKED' });
 
 const text = value => String(value ?? '').trim();
 const upper = value => text(value).toUpperCase();
@@ -56,7 +57,7 @@ function humanCarryover(item, context) {
   return governed ? { ...base, admissionDetail: 'GOVERNED_WORKFLOW_ACTIVE' } : null;
 }
 
-/** V4.7 TODAY = Pipeline ranks 1..10 plus governed lifecycle carryovers. */
+/** V4.8 TODAY = Strong Pool ranks 1..10 plus governed lifecycle carryovers. */
 export function selectTodayMembership(data = {}, { capacity = TODAY_TARGET, pipeline = null } = {}) {
   const target = Math.max(0, Number(capacity) || 0);
   const pipelineSelection = pipeline || selectPipelineAdmission(data);
@@ -73,18 +74,21 @@ export function selectTodayMembership(data = {}, { capacity = TODAY_TARGET, pipe
   const carryovers = [...new Map((data.jobs || []).map(item => [item.job.id, item])).values()]
     .filter(item => !curatedIds.has(item.job.id)).map(item => humanCarryover(item, context)).filter(Boolean).sort(carryoverOrder);
   const members = [...curated, ...carryovers];
-  const pipelineExhausted = pipelineSelection.admitted.length < target;
-  const outcome = pipelineExhausted ? TODAY_REFILL_OUTCOMES.EXHAUSTED : TODAY_REFILL_OUTCOMES.FILLED;
+  const backlog = summarizeQualificationBacklog(data, pipelineSelection);
+  const underTarget = pipelineSelection.admitted.length < target;
+  const strongPoolExhausted = underTarget && backlog.exhausted;
+  const outcome = !underTarget ? TODAY_REFILL_OUTCOMES.FILLED
+    : strongPoolExhausted ? TODAY_REFILL_OUTCOMES.EXHAUSTED : TODAY_REFILL_OUTCOMES.PROCESSING;
   const trace = [
     ...curated.map(value => Object.freeze({ jobId: value.jobId, company: value.item.job.company, role: value.item.job.title,
       pipelineRank: value.pipelineRank, result: 'ADMITTED', admissionReason: value.admissionReason, exactRule: value.admissionDetail })),
     ...pipelineSelection.admitted.slice(target).map(value => Object.freeze({ jobId: value.jobId, company: value.item.job.company,
-      role: value.item.job.title, pipelineRank: value.pipelineRank, result: 'EXCLUDED', admissionReason: null, exactRule: 'OUTSIDE_PIPELINE_TOP_10' })),
+      role: value.item.job.title, pipelineRank: value.pipelineRank, result: 'PIPELINE', admissionReason: null, exactRule: 'STRONG_POOL_RANK_11_PLUS' })),
     ...carryovers.map(value => Object.freeze({ jobId: value.jobId, company: value.item.job.company, role: value.item.job.title,
       pipelineRank: null, result: 'ADMITTED', admissionReason: value.admissionReason, exactRule: value.admissionDetail })),
   ];
   const diagnostics = Object.freeze({
-    target, pipelineStrongCandidates: pipelineSelection.admitted.length,
+    target, strongPoolCandidates: pipelineSelection.admitted.length, pipelineStrongCandidates: pipelineSelection.admitted.length,
     todayCuratedFromPipeline: curated.length, humanCarryovers: carryovers.length,
     currentCount: members.length, visibleVacantSlots: Math.max(0, target - members.length),
     vacantSlots: Math.max(0, target - curated.length), outcome,
@@ -92,14 +96,17 @@ export function selectTodayMembership(data = {}, { capacity = TODAY_TARGET, pipe
     admitted: Object.freeze(members.map(value => Object.freeze({ jobId: value.jobId, company: value.item.job.company,
       role: value.item.job.title, rank: value.pipelineRank, finalPriority: value.finalPriority,
       admissionReason: value.admissionReason, detail: value.admissionDetail }))),
-    excludedByRule: Object.freeze(pipelineSelection.admitted.length > target ? [{ rule: 'OUTSIDE_PIPELINE_TOP_10', count: pipelineSelection.admitted.length - target }] : []),
+    excludedByRule: Object.freeze(pipelineSelection.admitted.length > target ? [{ rule: 'STRONG_POOL_RANK_11_PLUS', count: pipelineSelection.admitted.length - target }] : []),
     blockedCandidates: Object.freeze([]), admissibleRemainder: Math.max(0, pipelineSelection.admitted.length - curated.length),
-    exhaustionResult: pipelineExhausted ? 'PIPELINE_STRONG_CANDIDATE_UNIVERSE_EXHAUSTED' : null,
+    qualificationBacklog: backlog,
+    exhaustionResult: strongPoolExhausted ? 'STRONG_POOL_EXHAUSTED'
+      : underTarget ? 'QUALIFICATION_BACKLOG_PROCESSING' : null,
     trace: Object.freeze(trace),
   });
   return Object.freeze({
     target, capacity: target, outcome, diagnostics, pipeline: pipelineSelection,
     curated: Object.freeze(curated), carryovers: Object.freeze(carryovers),
+    pipelineWaiting: Object.freeze(pipelineSelection.admitted.slice(target)),
     pinned: Object.freeze(carryovers.filter(value => value.pinned)), held: Object.freeze(members.filter(value => value.held)),
     members: Object.freeze(members), curatedJobIds: Object.freeze(curated.map(value => value.jobId)),
     carryoverJobIds: Object.freeze(carryovers.map(value => value.jobId)), pinnedJobIds: Object.freeze(carryovers.map(value => value.jobId)),

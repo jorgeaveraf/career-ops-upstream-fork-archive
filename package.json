@@ -47,6 +47,7 @@
     "rank": "node opportunity-funnel.mjs",
     "candidate-set": "node candidate-set.mjs",
     "eligibility:repair": "node eligibility-repair.mjs",
+    "qualification:drain": "node qualification-drain.mjs",
     "candidate": "node candidate-kb.mjs",
     "deep-evaluate": "node deep-evaluate.mjs",
     "application-package": "node application-package.mjs",

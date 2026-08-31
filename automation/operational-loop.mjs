@@ -22,6 +22,7 @@ import { EVIDENCE_COMPLETENESS_VERSION, RESEARCH_NEEDS_VERSION, UNIFIED_CANDIDAT
 import { matchPreferenceSignals } from '../human-decision/rejection-intelligence.mjs';
 import { FeedbackCalibrationEngine } from '../feedback-calibration/engine.mjs';
 import { reconcileSheetHumanInputs } from '../execution-orchestration/reconciler.mjs';
+import { drainQualificationBacklog } from './qualification-orchestrator.mjs';
 
 const timestamp = clock => clock().toISOString();
 
@@ -179,7 +180,7 @@ export async function runOperationalLoop({
   dashboardUrl = process.env.CAREER_OPS_DASHBOARD_URL || (spreadsheetId ? `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit` : ''),
   env = process.env, clock = () => new Date(), registry: suppliedRegistry = null,
   dailyRunner = runDaily, rankStage = rankOperationalCandidates,
-  evaluationStage = evaluateOperationalCandidates, packageStage = packageOperationalCandidates,
+  evaluationStage = null, qualificationStage = drainQualificationBacklog, packageStage = packageOperationalCandidates,
   sheetStage = syncOperationalSheet, notificationProvider,
   humanInputStage = null, sheetAdapter = null, canonicalCv,
 } = {}) {
@@ -225,7 +226,9 @@ export async function runOperationalLoop({
     catch (error) { errors.push(operationalError('ranking', error)); }
     try {
       const candidateProvider = openCandidateKnowledge({ projectRoot });
-      evaluations = await evaluationStage({ registry, jobIds: ranking.shortlistedJobIds, candidateProvider, clock });
+      evaluations = evaluationStage
+        ? await evaluationStage({ registry, jobIds: ranking.shortlistedJobIds, candidateProvider, clock })
+        : await qualificationStage({ registry, projectRoot, candidateProvider, clock });
       packages = await packageStage({
         registry, evaluations: evaluations.evaluations, candidateProvider,
         canonicalCv: canonicalCv ?? readFileSync(new URL('../cv.md', import.meta.url), 'utf8'), clock,

@@ -23,7 +23,7 @@ export const TAB_CONTRACTS = Object.freeze({
   CONTACTS: tab('Entity ID', ['Job', 'Company', 'Name', 'Title', 'Contact Type', 'Why Relevant', 'Confidence', 'Public Profile', 'Public Email', 'Source', 'Verified At', 'Contact Status', 'Outreach Status', 'Outreach Outcome', 'Notes', 'Job URL', 'Job ID', 'Entity ID', 'Projection Hash'], ['Outreach Outcome', 'Notes']),
   FOLLOW_UPS: tab('Entity ID', ['Date', 'Action', 'Related Job', 'Status', 'Notes', 'Entity ID'], ['Date', 'Action', 'Related Job', 'Status', 'Notes']),
   SETTINGS: tab('Key', ['Key', 'Value', 'Owner', 'Description']),
-  SOURCE_METRICS: tab('Metric ID', ['Scope', 'Source', 'Strategy', 'Discovered', 'Valid', 'Duplicates', 'Eligible', 'Shortlist', 'Evaluated', 'Pipeline Admitted', 'TODAY Promoted', 'Applied', 'Package Ready', 'Provider ROI', 'Evaluation ROI', 'Last Run', 'Metric ID']),
+  SOURCE_METRICS: tab('Metric ID', ['Scope', 'Source', 'Strategy', 'Observed', 'Valid', 'Duplicates', 'Eligibility Resolved', 'Shortlist', 'Evaluated', 'Strong Pool Admitted', 'TODAY', 'Pipeline Waiting', 'Applied', 'Package Ready', 'Provider ROI', 'Evaluation ROI', 'Last Run', 'Metric ID']),
 });
 export const HUMAN_DECISIONS = CANONICAL_HUMAN_DECISIONS;
 export const APPLICATION_STATUSES = Object.freeze(['NO_OUTCOME','APPLIED','FOLLOW_UP','INTERVIEW','REJECTED_BY_COMPANY','OFFER','HIRED','WITHDRAWN','REJECTED','NO_RESPONSE','FAILED']);

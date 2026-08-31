@@ -237,7 +237,7 @@ test('scheduled discovery window ranks only its run and optionally refreshes SOU
     discoveryStage: async () => ({ status: 'SUCCESS', exitCode: 0, run: { id: 'scheduled-browser-run' }, failures: [] }),
     rankingStage: async input => { rankingInput = input; return { processed: 8, eligible: 4, shortlisted: 2, shortlistedJobIds: ['job-1'], recommendations: [] }; },
   });
-  assert.equal(result.status, 'SUCCESS'); assert.equal(result.automaticDailyIntegration, false);
+  assert.equal(result.status, 'SUCCESS'); assert.equal(result.automaticDailyIntegration, true);
   assert.equal(rankingInput.discoveryRunId, 'scheduled-browser-run');
   assert.deepEqual(sheetAdapter.tabs.JOBS, coreJobs);
   assert.deepEqual(Object.keys(sheetAdapter.tabs).sort(), ['JOBS', 'SOURCE_METRICS']);

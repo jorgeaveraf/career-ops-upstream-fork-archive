@@ -1,8 +1,8 @@
 import { CONTROL_PLANE_TABS, HUMAN_FIELD_VALIDATION, OPTIONAL_CONTROL_PLANE_TABS, TAB_CONTRACTS } from './contracts.mjs';
-import { buildManagedTabFormatRequests, buildReadmeFormatRequests, buildReadmeValues, buildTabOrderRequests, buildTodayContextualValidationRequests, buildTodayPresentationMatrix, stripTodayPresentationMatrix, README_TAB, WORKBOOK_TAB_ORDER } from './sheet-ux.mjs';
+import { buildInfrastructureVisibilityRequests, buildManagedTabFormatRequests, buildReadmeFormatRequests, buildReadmeValues, buildTabOrderRequests, buildTodayContextualValidationRequests, buildTodayPresentationMatrix, stripTodayPresentationMatrix, README_TAB, WORKBOOK_TAB_ORDER } from './sheet-ux.mjs';
 
 const README_MIN_ROWS = 130;
-export const SHEET_UX_VERSION = '4.7';
+export const SHEET_UX_VERSION = '4.8';
 
 const scalar = value => value == null ? '' : String(value);
 const cell = (matrix, row, column) => scalar(matrix?.[row]?.[column]);
@@ -94,7 +94,7 @@ export class GoogleSheetsApiAdapter extends SheetsAdapter {
       await this.request(`${this.base}/values/${encodeURIComponent(`'${README_TAB}'!A:Z`)}:clear`, { method: 'POST', body: '{}' });
       await this.request(`${this.base}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`, { method: 'PUT', body: JSON.stringify({ range, majorDimension: 'ROWS', values }) });
     }
-    const formatRequests = structuralRequired?buildTabOrderRequests(current.sheets || []):[];
+    const formatRequests = structuralRequired?[...buildTabOrderRequests(current.sheets || []),...buildInfrastructureVisibilityRequests(current.sheets || [])]:[];
     if (structuralRequired) {
       if (includeCore && readme) formatRequests.push(...buildReadmeFormatRequests(readme));
       for (const sheet of current.sheets || []) {

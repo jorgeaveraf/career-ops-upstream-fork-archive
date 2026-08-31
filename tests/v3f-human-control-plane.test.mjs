@@ -58,7 +58,7 @@ test('daily completion summary is durable, Spanish, zero-safe and deduped by Mex
     registry.startOperationalRun({id:'technical-validation',startedAt:NOW});registry.finishOperationalRun('technical-validation',{status:'SUCCESS',finishedAt:NOW,summary:{kind:'technical_validation'},jobsFound:999});
     const service=new DailyCompletionSummaryService({registry,clock:()=>new Date(NOW)}),first=service.enqueueForLatestCompletedRun(),second=service.enqueueForLatestCompletedRun();
     assert.equal(localDate(new Date(NOW)),'2026-08-28');assert.equal(first.status,'PENDING');assert.equal(first.runId,'daily-1');assert.equal(second.status,'ALREADY_ENQUEUED');
-    const intents=registry.listNotificationIntents({limit:10}).filter(value=>value.notificationType==='DAILY_COMPLETION_SUMMARY');assert.equal(intents.length,1);assert.equal(intents[0].subject,'Career Ops — resumen de búsqueda de hoy');assert.match(intents[0].bodyText,/Nuevas observaciones: 0/);assert.match(intents[0].bodyText,/Pipeline fuerte: 0/);
+    const intents=registry.listNotificationIntents({limit:10}).filter(value=>value.notificationType==='DAILY_COMPLETION_SUMMARY');assert.equal(intents.length,1);assert.equal(intents[0].subject,'Career Ops — resumen de búsqueda de hoy');assert.match(intents[0].bodyText,/Nuevas en Registry: 0/);assert.match(intents[0].bodyText,/Strong Pool: 0/);
   }finally{registry.close();}
 });
 
@@ -70,7 +70,7 @@ test('manual command success stays silent while failure remains actionable',()=>
 
 test('daily template is concise, linked and does not enumerate jobs',()=>{
   const rendered=renderActionableNotification('DAILY_COMPLETION_SUMMARY',{reviewed:12,newJobs:8,passed:5,shortlisted:4,promoted:2,today:10,attention:2,topThree:[],applicationsConfirmed:0,unresolvedFailures:0,limitedSources:1,systemStatus:'HEALTHY',sheetUrl:'https://docs.google.com/spreadsheets/d/sheet/edit'});
-  assert.match(rendered.text,/Revisadas: 12/);assert.match(rendered.text,/Evaluadas con APPLY: 2/);assert.match(rendered.text,/Pipeline fuerte:/);assert.match(rendered.text,/TODAY desde Pipeline:/);assert.match(rendered.text,/Abrir TODAY/);assert.doesNotMatch(rendered.text,/Supabase|job-1/);
+  assert.match(rendered.text,/Revisadas: 12/);assert.match(rendered.text,/Evaluadas:/);assert.match(rendered.text,/Strong Pool:/);assert.match(rendered.text,/TODAY:/);assert.match(rendered.text,/Abrir TODAY/);assert.doesNotMatch(rendered.text,/Supabase|job-1/);
 });
 
 test('artifact access is loopback-only, exact-package-bound and hides filesystem paths',async()=>{

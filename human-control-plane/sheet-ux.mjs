@@ -65,7 +65,7 @@ export function buildReadmeValues() {
   const rows = Array.from({ length: 122 }, () => Array(8).fill(''));
   const put = (row, column, value) => { rows[row - 1][column - 1] = value; };
   put(1, 1, 'Career Ops');
-  put(2, 1, 'Guía del operador V4.7 · Pipeline fuerte + ranking único + hoja estable');
+  put(2, 1, 'Guía del operador V4.8 · Strong Pool + TODAY/Pipeline disjuntos + calificación automática');
 
   put(4, 1, 'ASÍ OPERAS CAREER OPS');
   put(5, 1, 'CAREER OPS TRABAJA SOLO. Tu única bandeja diaria es TODAY.');
@@ -96,8 +96,8 @@ export function buildReadmeValues() {
   put(27, 1, 'TU RUTINA DIARIA');
   const routine = [
     ['1 · RECIBE AVISO', 'Career Ops te avisa sólo cuando hay resultado o intervención útil.'],
-    ['2 · ABRE TODAY', 'Es tu única bandeja diaria. Los ranks normales son exactamente los ranks de PIPELINE; HUMAN_CARRYOVER conserva trabajo gobernado.'],
-    ['3 · TRABAJA POR RANK', 'Avanza por Pipeline Rank; resuelve también cualquier HUMAN_CARRYOVER. PIPELINE no es un inbox alterno.'],
+    ['2 · ABRE TODAY', 'Es tu única bandeja diaria. Contiene ranks globales 1–10 del Strong Pool; HUMAN_CARRYOVER conserva trabajo gobernado.'],
+    ['3 · TRABAJA POR RANK', 'Avanza por rank. PIPELINE contiene sólo Strong Pool 11+ esperando su turno; nunca duplica TODAY.'],
     ['4 · REVISA', 'Revisa paquete, ruta oficial, mejor contacto, mensaje y timing.'],
     ['5 · EDITA AMARILLO', 'Completa únicamente las decisiones o respuestas humanas activas.'],
     ['6 · SYNC JOBS', 'Career Ops valida e importa tus cambios de forma idempotente.'],
@@ -189,8 +189,8 @@ export function buildReadmeValues() {
   put(105, 1, 'GUÍA DE PESTAÑAS');
   put(106, 1, 'PESTAÑA'); put(106, 2, 'PARA QUÉ SIRVE'); put(106, 5, 'PESTAÑA'); put(106, 6, 'PARA QUÉ SIRVE');
   const tabPairs = [
-    [['README','Esta guía.'],['TODAY','Top 10 de PIPELINE + carryovers humanos gobernados.']],
-    [['PIPELINE','Todas las oportunidades fuertes que Career Ops considera dignas de perseguir.'],['RESEARCH','Evidencia/evaluación todavía incompleta.']],
+    [['README','Esta guía.'],['TODAY','Strong Pool ranks 1–10 + carryovers humanos gobernados.']],
+    [['PIPELINE','Strong Pool ranks 11+; ya son oportunidades dignas de perseguir.'],['RESEARCH','Infraestructura interna oculta; Career Ops la opera automáticamente.']],
     [['APPLICATIONS','Aplicaciones confirmadas + outreach status + follow-up + outcomes.'],['CONTACTS','Contact Intelligence verificada + provenance + outreach status.']],
     [['FOLLOW_UPS','Follow-up recomendado/agendado y trabajo humano.'],['COMMUNITIES','WANT_TO_JOIN autoriza un join exacto; JOINED confirma membresía. Sync Communities nunca responde preguntas: SKIP/REJECT suprime sin borrar historial.']],
     [['SETTINGS','Incluye Candidate Gmail / LinkedIn Outreach readiness.'],['SOURCE_METRICS','Telemetría; no es de uso diario.']],
@@ -216,6 +216,12 @@ export function buildTabOrderRequests(sheets) {
     const sheet = byName.get(title);
     return sheet ? [{ updateSheetProperties: { properties: { sheetId: sheet.sheetId, index }, fields: 'index' } }] : [];
   });
+}
+
+export function buildInfrastructureVisibilityRequests(sheets) {
+  const research = (sheets || []).find(sheet => sheet.properties.title === 'RESEARCH')?.properties;
+  if (!research || research.hidden === true) return [];
+  return [{ updateSheetProperties: { properties: { sheetId: research.sheetId, hidden: true }, fields: 'hidden' } }];
 }
 
 function columnWidths(name, columns) {

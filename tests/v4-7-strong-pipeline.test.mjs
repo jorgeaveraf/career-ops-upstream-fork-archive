@@ -84,7 +84,7 @@ test('TODAY normal rows are exactly Pipeline ranks 1 through 10',()=>{
 test('Pipeline under ten yields healthy TODAY underfill without Registry fallback',()=>{
   const input=dataset([...Array.from({length:7},(_,i)=>candidate(i)),candidate(8,{eligibility:'UNKNOWN'}),candidate(9,{evaluation:null})]);
   const today=selectTodayMembership(input);assert.equal(today.pipeline.admitted.length,7);assert.equal(today.curated.length,7);
-  assert.equal(today.outcome,'EXHAUSTED');assert.equal(today.diagnostics.exhaustionResult,'PIPELINE_STRONG_CANDIDATE_UNIVERSE_EXHAUSTED');
+  assert.equal(today.outcome,'PROCESSING');assert.equal(today.diagnostics.exhaustionResult,'QUALIFICATION_BACKLOG_PROCESSING');
 });
 
 test('rank 11 promotes when Pipeline rank 3 becomes APPLIED',()=>{
@@ -99,9 +99,9 @@ test('Human REJECT removes from Pipeline and promotes the next rank',()=>{
   const result=selectTodayMembership(input);assert.equal(result.curated.length,10);assert.equal(result.memberJobIds.includes('job-2'),false);assert.equal(result.curated.at(-1).jobId,'job-10');
 });
 
-test('strong HOLD remains a ranked Pipeline member but produces no Human attention',()=>{
+test('strong HOLD remains a ranked Strong Pool member in TODAY but produces no Human attention',()=>{
   const input=dataset([candidate(0)],{humanState:[state('job-0','human_decision','HOLD')]});
-  const projection=buildControlPlaneProjection(input);assert.equal(projection.tabs.PIPELINE[0].State,'HOLD');assert.equal(projection.tabs.TODAY[0].Rank,1);
+  const projection=buildControlPlaneProjection(input);assert.equal(projection.tabs.PIPELINE.length,0);assert.equal(projection.tabs.TODAY[0].Rank,1);
   assert.equal(projection.tabs.TODAY[0].Status,'ON_HOLD');assert.equal(projection.tabs.SETTINGS.find(x=>x.Key==='Needs Your Attention').Value,0);
 });
 

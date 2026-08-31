@@ -157,7 +157,7 @@ test('obsolete implementation-history language is absent from operator README', 
   for(const stale of ['manual LinkedIn','candidate Gmail unavailable','recomienda una estrategia de aplicación/outreach'])assert.doesNotMatch(text,new RegExp(stale,'i'));
 });
 
-test('first two operator screens answer the V4.7 acceptance questions',()=>{const first=values().slice(0,52).flat().join('\n');for(const phrase of ['TODAY','READY','Pipeline Rank','HUMAN_CARRYOVER','APPROVE_TO_APPLY','APPROVE_OUTREACH','GMAIL','LINKEDIN','OTRAS RUTAS','aplica primero','APPLICATIONS'])assert.match(first,new RegExp(phrase,'i'));});
+test('first two operator screens answer the V4.8 acceptance questions',()=>{const first=values().slice(0,52).flat().join('\n');for(const phrase of ['TODAY','READY','Strong Pool','HUMAN_CARRYOVER','APPROVE_TO_APPLY','APPROVE_OUTREACH','GMAIL','LINKEDIN','OTRAS RUTAS','aplica primero','APPLICATIONS'])assert.match(first,new RegExp(phrase,'i'));});
 
 test('Apps Script menu remains exactly Sync Jobs and Sync Communities', () => {
   const source = readFileSync(new URL('../human-control-plane/apps-script/Code.gs', import.meta.url), 'utf8');

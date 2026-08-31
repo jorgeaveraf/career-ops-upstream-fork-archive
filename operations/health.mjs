@@ -19,7 +19,7 @@ import { MacOsKeychainCredentialStore } from '../application-execution/credentia
 
 const check = (name, status, detail, data = {}) => ({ name, status, detail, ...data });
 
-function readDatabaseHealth(dbPath) {
+function readDatabaseHealth(dbPath, nowMs = Date.now()) {
   if (!existsSync(dbPath)) return { checks: [check('Database', 'FAIL', `Not found: ${dbPath}`)], facts: {} };
   let db;
   try {
@@ -44,6 +44,26 @@ function readDatabaseHealth(dbPath) {
     const handoffCounts=handoffRegistry?db.prepare("SELECT status,resume_status,COUNT(*) count FROM human_handoffs GROUP BY status,resume_status").all():[];
     const questionResolutionRegistry=db.prepare("SELECT 1 ok FROM sqlite_master WHERE type='table' AND name='application_question_resolutions'").get();
     const questionResolutionCount=questionResolutionRegistry?db.prepare('SELECT COUNT(*) count FROM application_question_resolutions').get().count:0;
+    const qualification=db.prepare(`
+      WITH latest AS (
+        SELECT ac.job_id,
+          (SELECT a.id FROM job_assessments a WHERE a.job_id=ac.job_id ORDER BY a.assessed_at DESC,a.rowid DESC LIMIT 1) assessment_id,
+          (SELECT a.eligibility_status FROM job_assessments a WHERE a.job_id=ac.job_id ORDER BY a.assessed_at DESC,a.rowid DESC LIMIT 1) eligibility_status,
+          (SELECT a.decision FROM job_assessments a WHERE a.job_id=ac.job_id ORDER BY a.assessed_at DESC,a.rowid DESC LIMIT 1) decision,
+          (SELECT a.assessed_at FROM job_assessments a WHERE a.job_id=ac.job_id ORDER BY a.assessed_at DESC,a.rowid DESC LIMIT 1) assessed_at
+        FROM active_candidates ac WHERE ac.state IN ('ACTIVE','CARRYOVER')
+      ), pending AS (
+        SELECT job_id,assessed_at pending_at FROM latest WHERE eligibility_status IS NULL OR eligibility_status='UNKNOWN'
+        UNION SELECT l.job_id,l.assessed_at FROM latest l WHERE l.decision='SHORTLIST' AND NOT EXISTS(SELECT 1 FROM job_evaluations e WHERE e.assessment_id=l.assessment_id)
+        UNION SELECT n.job_id,n.created_at FROM candidate_research_needs n JOIN latest l ON l.job_id=n.job_id WHERE n.status IN ('OPEN','BLOCKED')
+      )
+      SELECT (SELECT COUNT(*) FROM latest) active_count,
+        (SELECT COUNT(*) FROM latest WHERE eligibility_status IS NULL OR eligibility_status='UNKNOWN') eligibility_pending,
+        (SELECT COUNT(*) FROM latest l WHERE l.decision='SHORTLIST' AND NOT EXISTS(SELECT 1 FROM job_evaluations e WHERE e.assessment_id=l.assessment_id)) evaluation_pending,
+        (SELECT COUNT(*) FROM candidate_research_needs n JOIN latest l ON l.job_id=n.job_id WHERE n.status IN ('OPEN','BLOCKED')) research_pending,
+        COUNT(DISTINCT job_id) pending_candidates,MIN(pending_at) oldest_pending_at,
+        (SELECT MAX(evaluated_at) FROM job_evaluations) last_evaluation_at
+      FROM pending`).get();
     const operationalSummary=readOperationalSummary(db);
     return {
       checks: [
@@ -54,8 +74,10 @@ function readDatabaseHealth(dbPath) {
         check('Last successful sync', latestSync ? 'OK' : 'WARN', latestSync || 'No successful push recorded'),
         check('Last notification', ['FAILED','AMBIGUOUS'].includes(latestNotification?.status) ? 'WARN' : 'OK', latestNotification ? `${latestNotification.status} at ${latestNotification.last_attempt_at||latestNotification.created_at}` : 'No notification recorded'),
         check('Operational intelligence', operationalSummary?.overall==='ATTENTION'?'WARN':operationalSummary?.overall==='DEGRADED'?'WARN':'OK', operationalSummary?`${operationalSummary.overall} · ${operationalSummary.openSignals} open issue(s)`:'Not initialized'),
+        check('Qualification Engine', qualification.pending_candidates && qualification.oldest_pending_at && nowMs-Date.parse(qualification.oldest_pending_at)>72*3600000?'WARN':'OK', `${qualification.pending_candidates||0} pending candidate(s) · eligibility ${qualification.eligibility_pending||0} · research ${qualification.research_pending||0} · oldest ${qualification.oldest_pending_at||'NONE'}`),
+        check('Evaluation Engine', qualification.evaluation_pending && (!qualification.last_evaluation_at||nowMs-Date.parse(qualification.last_evaluation_at)>72*3600000)?'WARN':'OK', `${qualification.evaluation_pending||0} pending · last success ${qualification.last_evaluation_at||'NONE'} · deterministic bounded drain`),
       ],
-      facts: { latestOperationalRun: latestOperational || null, latestSuccessfulSyncAt: latestSync, latestNotification: latestNotification || null, notificationCounts:Object.fromEntries(notificationCounts.map(x=>[x.status,x.count])), workflowEventCount:eventCount, workerQueues, handoffRegistry:Boolean(handoffRegistry),handoffCounts,questionResolutionRegistry:Boolean(questionResolutionRegistry),questionResolutionCount, operationalSummary, pendingHumanActions: packageActions + reviewActions + applicationActions + pendingFollowUps + contactActions },
+      facts: { latestOperationalRun: latestOperational || null, latestSuccessfulSyncAt: latestSync, latestNotification: latestNotification || null, notificationCounts:Object.fromEntries(notificationCounts.map(x=>[x.status,x.count])), workflowEventCount:eventCount, workerQueues, handoffRegistry:Boolean(handoffRegistry),handoffCounts,questionResolutionRegistry:Boolean(questionResolutionRegistry),questionResolutionCount, qualification, operationalSummary, pendingHumanActions: packageActions + reviewActions + applicationActions + pendingFollowUps + contactActions },
     };
   } catch (error) {
     return { checks: [check('Database', 'FAIL', error.message)], facts: {} };
@@ -72,7 +94,7 @@ export async function runHealthCheck({
   const checks = [];
   const major = Number.parseInt(process.versions.node.split('.')[0], 10);
   checks.push(check('Runtime', major >= 18 ? 'OK' : 'FAIL', `Node ${process.versions.node}`));
-  const database = readDatabaseHealth(absoluteDb); checks.push(...database.checks);
+  const database = readDatabaseHealth(absoluteDb, clock().getTime()); checks.push(...database.checks);
   const config = validateOperationalConfig({ env, projectRoot, dbPath, requireDatabase: true });
   checks.push(check('Configuration', config.ok ? 'OK' : 'FAIL', config.ok ? 'Required configuration present' : config.errors.map(item => item.code).join(', '), { errors: config.errors, warnings: config.warnings }));
   if (config.identityRouting.configured) checks.push(check('Identity Routing', config.identityRouting.ok ? 'OK' : 'FAIL', config.identityRouting.ok ? 'Brunova → Workspace/GCP/system sender; Jorge → job browser/application sender/notification recipient; sign-up isolated' : config.identityRouting.errors.map(item => item.code).join(', '), { routes: config.identityRouting.routes }));

@@ -1751,7 +1751,10 @@ export class JobRegistry {
       activeCandidates, latestSnapshotRun, snapshot,
       top10: snapshot.filter(item => item.isTop10),
       metrics: latestSnapshotRun ? this.getSemanticFunnelMetrics(latestSnapshotRun) : [],
-      researchNeeds: this.listCandidateResearchNeeds({ status: 'OPEN' }),
+      researchNeeds: [
+        ...this.listCandidateResearchNeeds({ status: 'OPEN' }),
+        ...this.listCandidateResearchNeeds({ status: 'BLOCKED' }),
+      ],
       reassessmentQueue: this.listCandidateReassessmentQueue({ status: 'PENDING' }),
     };
   }

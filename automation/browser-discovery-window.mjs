@@ -3,6 +3,7 @@ import { GoogleSheetsApiAdapter } from '../human-control-plane/sheets-adapter.mj
 import { syncSourceMetricsSheet } from '../human-control-plane/source-metrics.mjs';
 import { runBrowserDiscovery } from '../research/discovery-runner.mjs';
 import { createGoogleOAuthTokenProviderFromEnv, inspectGoogleOAuthConfig } from '../operations/google-oauth.mjs';
+import { drainQualificationBacklog } from './qualification-orchestrator.mjs';
 
 export async function runBrowserDiscoveryWindow({
   registry, discoveryOptions,
@@ -10,7 +11,8 @@ export async function runBrowserDiscoveryWindow({
   portalsPath = process.env.CAREER_OPS_PORTALS || 'portals.yml', clock = () => new Date(),
   spreadsheetId = process.env.CAREER_OPS_SHEET_ID || '', tokenProvider = null, env = process.env,
   sheetAdapter = null, discoveryStage = runBrowserDiscovery,
-  rankingStage = rankOperationalCandidates, sourceMetricsStage = syncSourceMetricsSheet,
+  rankingStage = rankOperationalCandidates, qualificationStage = drainQualificationBacklog,
+  sourceMetricsStage = syncSourceMetricsSheet, projectRoot = process.cwd(),
 } = {}) {
   if (!registry) throw new TypeError('registry is required');
   const errors = [];
@@ -19,6 +21,11 @@ export async function runBrowserDiscoveryWindow({
   if (discovery.status !== 'FAILED') {
     try { ranking = await rankingStage({ registry, discoveryRunId: discovery.run.id, profilePath, portalsPath, clock }); }
     catch (error) { errors.push({ stage: 'ranking', code: error.code || 'BROWSER_DISCOVERY_RANKING_FAILED', message: error.message }); }
+  }
+  let qualification = { completed: 0, skipped: true };
+  if (discovery.status !== 'FAILED' && rankingStage === rankOperationalCandidates) {
+    try { qualification = await qualificationStage({ registry, projectRoot, clock }); }
+    catch (error) { errors.push({ stage: 'qualification', code: error.code || 'QUALIFICATION_DRAIN_FAILED', message: error.message }); }
   }
   const runMetrics = registry.getBrowserDiscoveryMetrics(discovery.run.id);
   const strategyMetrics = registry.getBrowserDiscoveryStrategyMetrics?.(discovery.run.id) || [];
@@ -36,7 +43,7 @@ export async function runBrowserDiscoveryWindow({
   const status = discovery.status === 'FAILED' ? 'FAILED' : discovery.status === 'PARTIAL' || errors.length ? 'PARTIAL' : 'SUCCESS';
   return {
     status, exitCode: status === 'SUCCESS' ? 0 : status === 'PARTIAL' ? 2 : 1,
-    discovery, ranking, runMetrics, strategyMetrics, providerPerformance, sheet, errors,
-    automaticDailyIntegration: false,
+    discovery, ranking, qualification, runMetrics, strategyMetrics, providerPerformance, sheet, errors,
+    automaticDailyIntegration: true,
   };
 }

@@ -126,14 +126,15 @@ test('COMMUNITIES formatting makes human-required and join lifecycle states visi
   for (const state of ['NEEDS_HUMAN','JOIN_REQUESTED','VERIFICATION_UNKNOWN','JOINED_CONFIRMED']) assert.match(text, new RegExp(state));
 });
 
-test('projection maps registry-owned job facts into TODAY and PIPELINE rows', () => {
+test('projection maps a top-ten Strong Pool job into TODAY but not PIPELINE', () => {
   const artifact = projection('job-1');
   const row = artifact.tabs.TODAY[0];
   assert.deepEqual({ lane:row.Lane, Company: row.Company, Role: row.Role, Eligibility: row.Eligibility, finalPriority: row['Final Priority'], evaluation:row.Evaluation, humanDecision: row['Human Decision'], entityId: row['Entity ID'] }, {
     lane:'CURATED_PIPELINE',Company: 'Acme Labs', Role: 'AI Platform Engineer', Eligibility: 'ELIGIBLE',
     finalPriority: 87, evaluation:'APPLY · HIGH', humanDecision: 'NO_ACTION', entityId: 'job-1',
   });
-  assert.equal(artifact.tabs.PIPELINE[0].State, 'ACTIVE');
+  assert.equal(artifact.tabs.PIPELINE.length, 0);
+  assert.deepEqual(artifact.diagnostics.todayPipelineOverlap, []);
 });
 
 test('legacy APPROVE is imported as canonical NEXT_STAGE through the allowlisted action boundary', () => {
@@ -196,7 +197,7 @@ test('authoritative push after pull consumes stale sheet decisions instead of re
     const sheetRows = Object.fromEntries(CONTROL_PLANE_TABS.map(name => [name, matrixToRows(name, adapter.tabs[name])]));
     const replay = collectHumanActions({ projection: refreshed, sheetRows, spreadsheetId: SPREADSHEET, observedAt: NOW, user: 'jorge' });
     assert.equal(replay.accepted.filter(item => item.field === 'human_decision').length, 0);
-    assert.equal(matrixToRows('PIPELINE', adapter.tabs.PIPELINE)[0]['Human Decision'], 'NEXT_STAGE');
+    assert.equal(matrixToRows('TODAY', adapter.tabs.TODAY)[0]['Human Decision'], 'NEXT_STAGE');
   } finally { registry.close(); }
 });
 
@@ -258,7 +259,7 @@ test('decision-first TODAY is capped at 10 and does not fill when fewer candidat
 
 test('6000 raw registry rows cannot leak into the bounded decision projection', () => {
   const tabs = buildControlPlaneProjection(decisionFixture(69, { rawCount: 6000 })).tabs;
-  assert.equal(tabs.TODAY.length, 10); assert.equal(tabs.PIPELINE.length, 69); assert.equal(tabs.RESEARCH.length, 69);
+  assert.equal(tabs.TODAY.length, 10); assert.equal(tabs.PIPELINE.length, 59); assert.equal(tabs.RESEARCH.length, 69);
   assert.equal(tabs.PIPELINE.some(row => row['Entity ID'] === 'job-5999'), false);
 });
 
@@ -277,9 +278,9 @@ test('human state follows entity identity across row movement, disappearance, an
   assert.equal(mergeProjectionRows('TODAY', [first.tabs.TODAY[4]], existing)[0].Notes, 'Keep this decision');
 });
 
-test('a current browser-created active candidate is included without a new discovery run', () => {
+test('a current top-ranked browser candidate is included in TODAY without a new discovery run', () => {
   const tabs = buildControlPlaneProjection(decisionFixture(2, { topCount: 2 })).tabs;
-  assert.equal(tabs.PIPELINE.find(row => row['Entity ID'] === 'job-0').Source, 'browser:indeed');
+  assert.equal(tabs.TODAY.find(row => row['Entity ID'] === 'job-0')['Job ID'], 'job-0');
 });
 
 test('stable IDs keep duplicate company/title candidates distinct and technical columns stay secondary', () => {

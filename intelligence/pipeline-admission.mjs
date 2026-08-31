@@ -76,10 +76,11 @@ function evaluate(item, context, thresholds) {
   if (['REJECTED', 'REJECTED_BY_COMPANY', 'WITHDRAWN', 'HIRED'].includes(applicationStatus)) return excluded(base, `TERMINAL_${applicationStatus}`);
   if (['APPLIED', 'REJECTED', 'CLOSED', 'EXPIRED', 'WITHDRAWN'].includes(upper(item.job.status))) return excluded(base, 'STALE_OR_CLOSED');
   if (['DISCARDED', 'ACTED', 'EXPIRED'].includes(upper(active?.state))) return excluded(base, 'STALE_OR_CLOSED');
+  if (context.enforceActive && !active) return excluded(base, 'INACTIVE_OR_STALE');
   if (eligibility !== 'ELIGIBLE') return excluded(base, eligibility === 'INELIGIBLE' ? 'HARD_STOP_INELIGIBLE' : 'ELIGIBILITY_NOT_RESOLVED');
+  if (shortlist !== 'SHORTLIST') return excluded(base, 'SHORTLIST_PRESELECTION_REQUIRED');
   if (evaluationStatus !== 'VALID' || !item.evaluation) return excluded(base, 'EVALUATION_NOT_READY');
   if (recommendation !== 'APPLY') return excluded(base, recommendation === 'DO_NOT_APPLY' ? 'PURSUIT_DO_NOT_APPLY' : 'PURSUIT_RECOMMENDATION_UNKNOWN');
-  if (shortlist !== 'SHORTLIST') return excluded(base, 'SHORTLIST_PRESELECTION_REQUIRED');
   if (text(item.job.description).length < thresholds.minimumDescriptionCharacters
       || !text(item.job.url) || upper(item.job.company) === 'UNKNOWN' || !employmentModel) {
     return excluded(base, 'INSUFFICIENT_EVIDENCE');
@@ -105,12 +106,13 @@ export function selectPipelineAdmission(data = {}, { thresholds = PIPELINE_ADMIS
     states: stateMap(data.humanState),
     snapshots: byJob(data.candidateSelection?.snapshot),
     active: byJob(data.candidateSelection?.activeCandidates),
+    enforceActive: Array.isArray(data.candidateSelection?.activeCandidates),
     executions: byJob(data.applicationExecutions),
   };
   const unique = [...new Map((data.jobs || []).map(item => [item.job.id, item])).values()];
   const evaluated = unique.map(item => evaluate(item, context, thresholds));
   const admitted = evaluated.filter(value => value.admitted).sort(orderPipeline)
-    .map((value, index) => Object.freeze({ ...value, pipelineRank: index + 1 }));
+    .map((value, index) => Object.freeze({ ...value, strongPoolRank: index + 1, pipelineRank: index + 1 }));
   const rankById = new Map(admitted.map(value => [value.jobId, value.pipelineRank]));
   const trace = evaluated.map(value => Object.freeze({
     jobId: value.jobId, company: value.item.job.company, role: value.item.job.title,
@@ -140,7 +142,7 @@ export function selectPipelineAdmission(data = {}, { thresholds = PIPELINE_ADMIS
     excludedByRule: Object.freeze(excludedByRule),
     trace: Object.freeze(trace),
     metrics: Object.freeze({
-      pipelineCount: admitted.length,
+      strongPoolCount: admitted.length, pipelineCount: admitted.length,
       medianCandidateFit: median(admitted.map(value => value.candidateFit)),
       medianOpportunityQuality: median(admitted.map(value => value.opportunityQuality)),
       evidenceConfidenceDistribution: Object.freeze(confidenceDistribution),
