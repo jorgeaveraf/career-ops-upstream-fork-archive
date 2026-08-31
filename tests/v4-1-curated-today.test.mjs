@@ -10,18 +10,18 @@ import { NotificationDeliveryWorker } from '../notifications/outbox.mjs';
 const NOW='2026-08-29T23:00:00.000Z';
 const makeData=()=>{
   const jobs=Array.from({length:16},(_,index)=>({
-    job:{id:`job-${index}`,company:`Company ${index}`,title:`Role ${index}`,location:'Remote — Mexico',url:`https://example.test/${index}`,lastSeenAt:NOW},
-    assessment:{eligibilityStatus:'ELIGIBLE',decision:'SHORTLIST',finalPriorityScore:100-index,result:{candidateFit:{score:90-index,reasons:['Relevant role']}}},
-    evaluation:index===14?null:{recommendation:index===13?'DO_NOT_APPLY':'APPLY',confidence:index===13?'LOW':'HIGH',gaps:index===13?['Material pursuit risk']:[]},
+    job:{id:`job-${index}`,company:`Company ${index}`,title:`Role ${index}`,location:'Remote — Mexico',description:'Strong evidenced role. '.repeat(20),identityConfidence:'high',url:`https://example.test/${index}`,lastSeenAt:NOW},
+    assessment:{eligibilityStatus:'ELIGIBLE',decision:'SHORTLIST',finalPriorityScore:100-index,confidence:'high',employmentModel:'contract',result:{candidateFit:{score:90,reasons:['Relevant role']},opportunity:{score:80},eligibility:{signals:{employmentModel:'contract',evidenceCompleteness:{description:{status:'PRESENT'},geography:{status:'SUPPORTED'},employment:{status:'PRESENT'},compensation:{status:'UNKNOWN'}}}}}},
+    evaluation:index===14?null:{status:'VALID',recommendation:index===13?'DO_NOT_APPLY':'APPLY',confidence:index===13?'LOW':'HIGH',overallFit:index===13?0:90,gaps:index===13?['Material pursuit risk']:[]},
   }));
   const snapshot=jobs.map((value,index)=>({jobId:value.job.id,rank:index+1,eligibilityStatus:'ELIGIBLE',decision:'SHORTLIST',finalPriorityScore:100-index}));
-  return{jobs,humanState:[{entityType:'JOB',entityId:'job-13',field:'human_decision',value:'NEXT_STAGE'},{entityType:'JOB',entityId:'job-15',field:'human_decision',value:'HOLD'}],candidateSelection:{snapshot,top10:snapshot.slice(0,10),activeCandidates:snapshot.map(value=>({jobId:value.jobId,state:'ACTIVE'})),researchNeeds:[]},enrichmentRequests:[],applicationExecutions:[],contacts:[],contactResearch:[],communities:[],workflowStatuses:[],communityWorkflowStatuses:[]};
+  return{jobs,humanState:[{entityType:'JOB',entityId:'job-13',field:'human_decision',value:'NEXT_STAGE'},{entityType:'JOB',entityId:'job-15',field:'human_decision',value:'HOLD'}],candidateSelection:{snapshot,top10:snapshot.slice(0,10),activeCandidates:snapshot.map(value=>({jobId:value.jobId,state:'ACTIVE'})),researchNeeds:[]},enrichmentRequests:[{jobId:'job-13',status:'READY_FOR_REVIEW'}],applicationExecutions:[],contacts:[],contactResearch:[],communities:[],workflowStatuses:[],communityWorkflowStatuses:[]};
 };
 
-test('TodayMembershipPolicy admits APPLY only and every pin/hold consumes total capacity',()=>{
+test('TodayMembershipPolicy selects top Pipeline ranks and appends governed carryovers',()=>{
   const data=makeData(),membership=selectTodayMembership(data,{capacity:10});
-  assert.equal(membership.members.length,10);
-  assert.equal(membership.curated.length,8);
+  assert.equal(membership.members.length,12);
+  assert.equal(membership.curated.length,10);
   assert.equal(membership.pinnedJobIds.includes('job-13'),true);
   assert.equal(membership.held.some(value=>value.jobId==='job-15'),true);
   assert.equal(membership.curatedJobIds.includes('job-14'),false);
@@ -29,11 +29,11 @@ test('TodayMembershipPolicy admits APPLY only and every pin/hold consumes total 
   assert.equal(membership.outcome,'FILLED');
 });
 
-test('curated capacity refills deterministically after an applied item leaves',()=>{
+test('curated Pipeline slice promotes the next unified rank after an applied item leaves',()=>{
   const data=makeData(),before=selectTodayMembership(data,{capacity:10});
   const leaving=before.curatedJobIds[0];data.applicationExecutions=[{jobId:leaving,status:'APPLIED'}];
   const after=selectTodayMembership(data,{capacity:10});
-  assert.equal(after.members.length,10);
+  assert.equal(after.curated.length,10);
   assert.equal(after.memberJobIds.includes(leaving),false);
   assert.equal(after.memberJobIds.includes('job-8'),true);
 });
@@ -46,9 +46,11 @@ test('negative evaluation review is low priority and cannot approve without a pa
   assert.equal(item.allowedActions.includes('APPROVE_TO_APPLY'),false);
 });
 
-test('TODAY physical ordering is identical to visible sequential rank',()=>{
+test('TODAY curated rows retain Pipeline rank while carryovers remain explicitly unranked',()=>{
   const projection=buildControlPlaneProjection(makeData()),rows=projection.tabs.TODAY;
-  assert.deepEqual(rows.map(row=>row.Rank),rows.map((_,index)=>index+1));
+  const curated=rows.filter(row=>row.Lane==='CURATED_PIPELINE'),carryovers=rows.filter(row=>row.Lane==='HUMAN_CARRYOVER');
+  assert.deepEqual(curated.map(row=>row.Rank),curated.map((_,index)=>index+1));
+  assert.ok(carryovers.every(row=>row.Rank===''));
   assert.equal(rows.some(row=>row['Entity ID']==='job-14'),false);
   assert.equal(rows.find(row=>row['Entity ID']==='job-13').Recommendation.startsWith('DO_NOT_APPLY'),true);
 });

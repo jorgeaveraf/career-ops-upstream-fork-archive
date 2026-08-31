@@ -9,7 +9,7 @@ import { flagValue } from './lib/cli-flags.mjs';
 export function buildTodayDiagnostic(data, options = {}) {
   const membership = selectTodayMembership(data, options);
   return {
-    version:'4.6', generatedFrom:'AUTHORITATIVE_JOB_REGISTRY',
+    version:'4.7', generatedFrom:'STRONG_PIPELINE_PLUS_GOVERNED_HUMAN_CARRYOVERS',
     ...membership.diagnostics,
   };
 }
@@ -18,8 +18,8 @@ function usage() {
   console.log(`Usage:
   node today-diagnostics.mjs [--db path] [--trace]
 
-Read-only V4.6 TODAY admission/refill diagnostic. --trace includes every
-Registry candidate considered and its exact admission/exclusion rule.`);
+Read-only V4.7 TODAY selection diagnostic. Registry-level exclusions belong to
+pipeline:diagnostics; --trace shows Pipeline top selection and Human carryovers.`);
 }
 
 function main() {

@@ -16,7 +16,7 @@ function registryWithJob() {
   registry.startRun({ id: 'run-control-plane' });
   const observed = registry.recordObservation('run-control-plane', {
     provider: 'fixture', externalId: 'job-1', sourceUrl: 'https://jobs.example.test/job-1',
-    title: 'AI Platform Engineer', company: 'Acme Labs', location: 'Remote', description: 'Build AI systems.', retrievedAt: NOW,
+    title: 'AI Platform Engineer', company: 'Acme Labs', location: 'Remote', description: 'Build and operate production AI platform systems for distributed teams. '.repeat(8), retrievedAt: NOW,
   });
   registry.finishRun('run-control-plane');
   return { registry, jobId: observed.jobId };
@@ -25,9 +25,9 @@ function data(jobId) {
   const snapshot = { jobId, rank: 1, previousRank: null, movement: 'NEW', finalPriorityScore: 87, eligibilityStatus: 'ELIGIBLE', candidateFitScore: 88, opportunityScore: 85, isTop10: true, evidenceWeak: false, evidenceCompleteness: { description: { status: 'SUPPORTED' }, geography: { status: 'SUPPORTED' }, employment: { status: 'SUPPORTED' }, compensation: { status: 'SUPPORTED' } } };
   return {
     jobs: [{
-      job: { id: jobId, title: 'AI Platform Engineer', company: 'Acme Labs', location: 'Remote', status: 'DISCOVERED', url: 'https://jobs.example.test/job-1', source: 'fixture', lastSeenAt: NOW },
-      assessment: { eligibilityStatus: 'ELIGIBLE', eligibilityScore: 90, candidateFitScore: 88, opportunityScore: 85, finalPriorityScore: 87, decision: 'SHORTLIST', employmentModel: 'contract' },
-      evaluation: { id: 'evaluation-1', status: 'VALID', recommendation: 'APPLY', evaluatedAt: NOW },
+      job: { id: jobId, title: 'AI Platform Engineer', company: 'Acme Labs', location: 'Remote', description:'Build and operate production AI platform systems for distributed teams. '.repeat(8),identityConfidence:'high',status: 'DISCOVERED', url: 'https://jobs.example.test/job-1', source: 'fixture', lastSeenAt: NOW },
+      assessment: { eligibilityStatus: 'ELIGIBLE', eligibilityScore: 90, candidateFitScore: 88, opportunityScore: 85, finalPriorityScore: 87, decision: 'SHORTLIST', confidence:'high',employmentModel: 'contract',result:{candidateFit:{score:88},opportunity:{score:85},eligibility:{signals:{employmentModel:'contract',evidenceCompleteness:{description:{status:'PRESENT'},geography:{status:'SUPPORTED'},employment:{status:'PRESENT'},compensation:{status:'UNKNOWN'}}}}} },
+      evaluation: { id: 'evaluation-1', status: 'VALID', recommendation: 'APPLY', confidence:'HIGH',overallFit:90,evaluatedAt: NOW },
       applicationPackage: { id: 'package-1', packageVersion: 1, status: 'DRAFT', validationStatus: 'VALID' },
     }],
     contacts: [], contactResearch: [], humanState: [], followUps: [], enrichmentRequests: [], applicationExecutions: [], runs: [{ id: 'run-control-plane', status: 'SUCCESS', startedAt: NOW, finishedAt: NOW }], syncState: null,
@@ -105,10 +105,10 @@ test('TODAY formatting gives action, review, and research distinct text-backed c
   assert.ok(hidden.length>=4);assert.ok(hidden.some(request=>request.updateDimensionProperties.range.startIndex===TAB_CONTRACTS.TODAY.columns.indexOf('Entity ID')));
 });
 
-test('PIPELINE formatting stays calm while surfacing attention, state, rank, and human input', () => {
+test('PIPELINE formatting stays calm while surfacing APPLY, state, unified rank, and human input', () => {
   const requests = buildManagedTabFormatRequests(fixtureSheet('PIPELINE'));
   const encoded = JSON.stringify(conditionalRules(requests));
-  for (const value of ['ACTION_READY', 'REVIEW_REQUIRED', 'RESEARCH_REQUIRED', 'ACTIVE', 'CARRYOVER']) assert.match(encoded, new RegExp(value));
+  for (const value of ['APPLY', 'ACTIVE', 'HOLD']) assert.match(encoded, new RegExp(value));
   assert.equal(requests.filter(request => request.updateCells?.rows?.[0]?.values?.[0]?.note === 'Human input — safe to edit.').length, 2);
 });
 
@@ -130,8 +130,8 @@ test('projection maps registry-owned job facts into TODAY and PIPELINE rows', ()
   const artifact = projection('job-1');
   const row = artifact.tabs.TODAY[0];
   assert.deepEqual({ lane:row.Lane, Company: row.Company, Role: row.Role, Eligibility: row.Eligibility, finalPriority: row['Final Priority'], evaluation:row.Evaluation, humanDecision: row['Human Decision'], entityId: row['Entity ID'] }, {
-    lane:'ATTENTION',Company: 'Acme Labs', Role: 'AI Platform Engineer', Eligibility: 'ELIGIBLE',
-    finalPriority: 87, evaluation:'APPLY · UNKNOWN', humanDecision: 'NO_ACTION', entityId: 'job-1',
+    lane:'CURATED_PIPELINE',Company: 'Acme Labs', Role: 'AI Platform Engineer', Eligibility: 'ELIGIBLE',
+    finalPriority: 87, evaluation:'APPLY · HIGH', humanDecision: 'NO_ACTION', entityId: 'job-1',
   });
   assert.equal(artifact.tabs.PIPELINE[0].State, 'ACTIVE');
 });
@@ -245,8 +245,8 @@ test('pull persists accepted actions and rejected score edits separately', async
 
 function decisionFixture(count = 12, { topCount = 10, rawCount = count, needsPerJob = 2 } = {}) {
   const activeCandidates = Array.from({ length: count }, (_, i) => ({ jobId: `job-${i}`, state: i % 2 ? 'CARRYOVER' : 'ACTIVE', preliminaryScore: 100 - i, freshnessDays: i, source: i === 0 ? 'browser:indeed' : 'fixture', updatedAt: NOW }));
-  const snapshot = activeCandidates.map((active, i) => ({ jobId: active.jobId, rank: i + 1, previousRank: i ? i + 2 : null, movement: i ? 'UP_1' : 'NEW', finalPriorityScore: 100 - i, eligibilityStatus: 'ELIGIBLE', decision:'SHORTLIST', candidateFitScore: 90 - i, opportunityScore: 80 - i, isTop10: i < topCount, evidenceWeak: true, evidenceCompleteness: { description: { status: 'MISSING' }, geography: { status: 'SUPPORTED' }, employment: { status: 'MISSING' }, compensation: { status: 'UNKNOWN' } } }));
-  const jobs = Array.from({ length: rawCount }, (_, i) => ({ job: { id: `job-${i}`, title: i < 2 ? 'Same Role' : `Role ${i}`, company: i < 2 ? 'Same Company' : `Company ${i}`, location: 'Remote', status: 'DISCOVERED', url: `https://example.test/${i}`, source: i === 0 ? 'browser:indeed' : 'fixture', lastSeenAt: NOW }, assessment: i < count ? { eligibilityStatus: 'ELIGIBLE', decision:'SHORTLIST', candidateFitScore: 90 - i, opportunityScore: 80 - i, finalPriorityScore: 100 - i, confidence: 'high', employmentModel: 'unknown', result: { candidateFit: { band: 'HIGH', evidence: { matchedRole: 'AI Systems Engineer' } }, eligibility: { signals: { geography: { status: 'SUPPORTED' }, evidenceCompleteness: snapshot[i].evidenceCompleteness } }, compensation: { status: 'UNKNOWN', value: null } } } : null, evaluation:i<count?{status:'VALID',recommendation:'APPLY',confidence:'HIGH'}:null, applicationPackage: null }));
+  const snapshot = activeCandidates.map((active, i) => ({ jobId: active.jobId, rank: i + 1, previousRank: i ? i + 2 : null, movement: i ? 'UP_1' : 'NEW', finalPriorityScore: 100-Math.min(i,10), eligibilityStatus: 'ELIGIBLE', decision:'SHORTLIST', candidateFitScore: 90, opportunityScore: 80, isTop10: i < topCount, evidenceWeak: false, evidenceCompleteness: { description: { status: 'PRESENT' }, geography: { status: 'SUPPORTED' }, employment: { status: 'PRESENT' }, compensation: { status: 'UNKNOWN' } } }));
+  const jobs = Array.from({ length: rawCount }, (_, i) => ({ job: { id: `job-${i}`, title: i < 2 ? 'Same Role' : `Role ${i}`, company: i < 2 ? 'Same Company' : `Company ${i}`, location: 'Remote',description:'Strong fully evidenced role description. '.repeat(12),identityConfidence:'high', status: 'DISCOVERED', url: `https://example.test/${i}`, source: i === 0 ? 'browser:indeed' : 'fixture', lastSeenAt: NOW }, assessment: i < count ? { eligibilityStatus: 'ELIGIBLE', decision:'SHORTLIST', candidateFitScore:90, opportunityScore:80, finalPriorityScore:100-Math.min(i,10), confidence: 'high', employmentModel: 'contract', result: { candidateFit: { score:90,band: 'HIGH', evidence: { matchedRole: 'AI Systems Engineer' } },opportunity:{score:80}, eligibility: { signals: { employmentModel:'contract',geography: { status: 'SUPPORTED' }, evidenceCompleteness: snapshot[i].evidenceCompleteness } }, compensation: { status: 'UNKNOWN', value: null } } } : null, evaluation:i<count?{status:'VALID',recommendation:'APPLY',confidence:'HIGH',overallFit:90}:null, applicationPackage: null }));
   const researchNeeds = activeCandidates.flatMap((active, i) => Array.from({ length: needsPerJob }, (_, n) => ({ jobId: active.jobId, type: n ? 'CONFIRM_COMPENSATION' : 'FETCH_FULL_DESCRIPTION', dimension: n ? 'compensation' : 'description', priority: i < topCount ? 'HIGH' : 'LOW', priorityScore: (i < topCount ? 100 : 20) - n, status: 'OPEN', updatedAt: NOW, resolvedAt: null })));
   return { jobs, contacts: [], contactResearch: [], enrichmentRequests: [], applicationExecutions: [], humanState: [], followUps: [], runs: [], syncState: null, candidateSelection: { latestSnapshotRun: 'snapshot-1', activeCandidates, snapshot, top10: snapshot.slice(0, topCount), researchNeeds } };
 }

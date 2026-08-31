@@ -8,9 +8,9 @@ import { detectOperationalSignals } from '../operational-intelligence/detectors.
 
 const NOW='2026-08-31T18:00:00.000Z';
 const job=(index,{recommendation='APPLY',eligibility='ELIGIBLE',decision='SHORTLIST',priority=100-index,status='VALID'}={})=>({
-  job:{id:`job-${index}`,company:`Company ${index}`,title:`Role ${index}`,location:'Remote — Mexico',url:`https://example.test/${index}`,lastSeenAt:NOW},
-  assessment:{eligibilityStatus:eligibility,decision,finalPriorityScore:priority,result:{candidateFit:{score:priority,reasons:['fit']}}},
-  evaluation:recommendation?{status,recommendation,confidence:'HIGH'}:null,
+  job:{id:`job-${index}`,company:`Company ${index}`,title:`Role ${index}`,location:'Remote — Mexico',description:'Strong evidenced opportunity. '.repeat(16),identityConfidence:'high',url:`https://example.test/${index}`,lastSeenAt:NOW},
+  assessment:{eligibilityStatus:eligibility,decision,finalPriorityScore:priority,confidence:'high',employmentModel:'contract',result:{candidateFit:{score:Math.max(80,priority),reasons:['fit']},opportunity:{score:80},eligibility:{signals:{employmentModel:'contract',evidenceCompleteness:{description:{status:'PRESENT'},geography:{status:'SUPPORTED'},employment:{status:'PRESENT'},compensation:{status:'UNKNOWN'}}}}}},
+  evaluation:recommendation?{status,recommendation,confidence:'HIGH',overallFit:recommendation==='APPLY'?90:0}:null,
 });
 const data=(jobs,humanState=[],extra={})=>({
   jobs,humanState,enrichmentRequests:[],applicationExecutions:[],humanHandoffs:[],contacts:[],contactResearch:[],communities:[],workflowStatuses:[],communityWorkflowStatuses:[],
@@ -29,7 +29,7 @@ test('9 TODAY plus no admissible remainder stays 9 with deterministic exhaustion
   const jobs=[...Array.from({length:9},(_,i)=>job(i)),job(9,{recommendation:'DO_NOT_APPLY'})];
   const result=selectTodayMembership(data(jobs));
   assert.equal(result.members.length,9);assert.equal(result.outcome,'EXHAUSTED');assert.equal(result.diagnostics.vacantSlots,1);
-  assert.equal(result.diagnostics.trace.find(x=>x.jobId==='job-9').exactRule,'MACHINE_DO_NOT_APPLY_WITHOUT_UNRESOLVED_HUMAN_WORK');
+  assert.equal(result.pipeline.trace.find(x=>x.jobId==='job-9').exactRule,'PURSUIT_DO_NOT_APPLY');
 });
 
 test('terminal application and Human rejection release a slot and refill from highest priority',()=>{
@@ -40,20 +40,20 @@ test('terminal application and Human rejection release a slot and refill from hi
   assert.equal(rejected.members.length,10);assert.equal(rejected.memberJobIds.includes('job-0'),false);assert.equal(rejected.memberJobIds.at(-1),'job-10');
 });
 
-test('explicit HOLD is HELD_VISIBLE, consumes capacity, and does not manufacture attention',()=>{
+test('explicit HOLD on a strong candidate remains ranked Pipeline work and does not manufacture attention',()=>{
   const input=data([job(0)],[state('job-0','human_decision','HOLD')]);
   const membership=selectTodayMembership(input),projection=buildControlPlaneProjection(input),row=projection.tabs.TODAY[0];
-  assert.equal(membership.members[0].admissionReason,'HELD_VISIBLE');assert.equal(membership.members.length,1);
+  assert.equal(membership.members[0].admissionReason,'CURATED_PIPELINE_ITEM');assert.equal(membership.members[0].admissionDetail,'STRONG_PIPELINE_HELD');assert.equal(membership.members.length,1);
   assert.equal(deriveHumanAttentionItems(input).length,0);assert.equal(row.Status,'ON_HOLD');assert.equal(row['Attention Type'],'');
   assert.equal(projection.tabs.SETTINGS.find(x=>x.Key==='Needs Your Attention').Value,0);
 });
 
-test('pinned background work consumes a slot and outranks new curated decisions',()=>{
+test('governed background work outside the top ten is an additional Human carryover',()=>{
   const jobs=Array.from({length:11},(_,i)=>job(i));
   const input=data(jobs,[state('job-10','human_decision','NEXT_STAGE')],{enrichmentRequests:[{jobId:'job-10',status:'PENDING'}]});
   const membership=selectTodayMembership(input);
-  assert.equal(membership.members.length,10);assert.equal(membership.memberJobIds.includes('job-10'),true);
-  assert.equal(membership.members.find(x=>x.jobId==='job-10').admissionReason,'PINNED');assert.equal(membership.memberJobIds.includes('job-9'),false);
+  assert.equal(membership.members.length,11);assert.equal(membership.memberJobIds.includes('job-10'),true);
+  assert.equal(membership.members.find(x=>x.jobId==='job-10').admissionReason,'HUMAN_CARRYOVER');assert.equal(membership.memberJobIds.includes('job-9'),true);
 });
 
 test('one vacant slot selects the deterministic highest-priority admissible candidate',()=>{
@@ -66,15 +66,15 @@ test('hard stops and duplicate canonical IDs never fill capacity',()=>{
   const jobs=[...Array.from({length:9},(_,i)=>job(i)),job(9,{eligibility:'INELIGIBLE'}),job(0)];
   const membership=selectTodayMembership(data(jobs));
   assert.equal(membership.members.length,9);assert.equal(new Set(membership.memberJobIds).size,9);
-  assert.equal(membership.diagnostics.trace.find(x=>x.jobId==='job-9').exactRule,'HARD_STOP_INELIGIBLE');
+  assert.equal(membership.pipeline.trace.find(x=>x.jobId==='job-9').exactRule,'HARD_STOP_INELIGIBLE');
 });
 
 test('DO_NOT_APPLY remains Human-governed only when an unresolved review exists',()=>{
   const jobs=[job(0,{recommendation:'DO_NOT_APPLY'}),job(1,{recommendation:'DO_NOT_APPLY'})];
   const input=data(jobs,[state('job-1','human_decision','NEXT_STAGE')],{enrichmentRequests:[{jobId:'job-1',status:'READY_FOR_REVIEW'}]});
   const membership=selectTodayMembership(input);
-  assert.deepEqual(membership.memberJobIds,['job-1']);assert.equal(membership.members[0].admissionReason,'HUMAN_ACTION');
-  assert.equal(membership.diagnostics.trace.find(x=>x.jobId==='job-0').exactRule,'MACHINE_DO_NOT_APPLY_WITHOUT_UNRESOLVED_HUMAN_WORK');
+  assert.deepEqual(membership.memberJobIds,['job-1']);assert.equal(membership.members[0].admissionReason,'HUMAN_CARRYOVER');
+  assert.equal(membership.pipeline.trace.find(x=>x.jobId==='job-0').exactRule,'PURSUIT_DO_NOT_APPLY');
 });
 
 test('Supabase-like cancelled history synthesizes reauthorization as the one current instruction',()=>{
@@ -88,18 +88,18 @@ test('true hold and impossible competing action have safe distinct projections',
 });
 
 test('NEXT_STAGE dispatch is deterministic by workflow state',()=>{
-  const pending=selectTodayMembership(data([job(0)],[state('job-0','human_decision','NEXT_STAGE')],{enrichmentRequests:[{jobId:'job-0',status:'PENDING'}]}));
-  assert.equal(pending.members[0].admissionReason,'PINNED');assert.equal(pending.members[0].admissionDetail,'GOVERNED_WORKFLOW_ACTIVE');
+  const pending=selectTodayMembership(data([job(0,{recommendation:'DO_NOT_APPLY'})],[state('job-0','human_decision','NEXT_STAGE')],{enrichmentRequests:[{jobId:'job-0',status:'PENDING'}]}));
+  assert.equal(pending.members[0].admissionReason,'HUMAN_CARRYOVER');assert.equal(pending.members[0].admissionDetail,'GOVERNED_WORKFLOW_ACTIVE');
   const review=selectTodayMembership(data([job(0,{recommendation:'DO_NOT_APPLY'})],[state('job-0','human_decision','NEXT_STAGE')],{enrichmentRequests:[{jobId:'job-0',status:'READY_FOR_REVIEW'}]}));
-  assert.equal(review.members[0].admissionReason,'HUMAN_ACTION');assert.equal(review.members[0].admissionDetail,'EVALUATION_OR_PACKAGE_REVIEW_REQUIRED');
+  assert.equal(review.members[0].admissionReason,'HUMAN_CARRYOVER');assert.equal(review.members[0].admissionDetail,'EVALUATION_OR_PACKAGE_REVIEW_REQUIRED');
 });
 
-test('under-target missing required priority is BLOCKED rather than EXHAUSTED',()=>{
+test('missing required Pipeline priority is excluded with a deterministic policy reason',()=>{
   const candidate=job(0);delete candidate.assessment.finalPriorityScore;
   const input=data([candidate]);delete input.candidateSelection.snapshot[0].finalPriorityScore;
   const membership=selectTodayMembership(input);
-  assert.equal(membership.outcome,'BLOCKED');assert.equal(membership.members.length,0);assert.deepEqual(membership.diagnostics.blockedCandidates,['job-0']);
-  assert.ok(detectOperationalSignals({today:membership.diagnostics}).some(x=>x.signalType==='TODAY_REFILL_BLOCKED'));
+  assert.equal(membership.outcome,'EXHAUSTED');assert.equal(membership.members.length,0);
+  assert.equal(membership.pipeline.trace[0].exactRule,'FINAL_PRIORITY_BELOW_THRESHOLD');
 });
 
 test('attention count is canonical and independent from row count after refill',()=>{

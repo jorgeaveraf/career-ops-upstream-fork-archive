@@ -2,7 +2,7 @@ import { CONTROL_PLANE_TABS, HUMAN_FIELD_VALIDATION, OPTIONAL_CONTROL_PLANE_TABS
 import { buildManagedTabFormatRequests, buildReadmeFormatRequests, buildReadmeValues, buildTabOrderRequests, buildTodayContextualValidationRequests, buildTodayPresentationMatrix, stripTodayPresentationMatrix, README_TAB, WORKBOOK_TAB_ORDER } from './sheet-ux.mjs';
 
 const README_MIN_ROWS = 130;
-export const SHEET_UX_VERSION = '4.5';
+export const SHEET_UX_VERSION = '4.7';
 
 const scalar = value => value == null ? '' : String(value);
 const cell = (matrix, row, column) => scalar(matrix?.[row]?.[column]);

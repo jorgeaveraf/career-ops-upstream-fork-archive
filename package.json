@@ -53,6 +53,7 @@
     "contact-intelligence": "node contact-intelligence.mjs",
     "control-plane": "node human-control-plane.mjs",
     "today:diagnostics": "node today-diagnostics.mjs",
+    "pipeline:diagnostics": "node pipeline-diagnostics.mjs",
     "sync:jobs": "node human-control-plane.mjs sync-jobs",
     "job-sync:launch-agent": "node job-sync-launch-agent.mjs",
     "command:subscriber": "node command-subscriber.mjs",

@@ -10,7 +10,8 @@ Commands:
 - `npm run ops -- recoveries --json` — verified recovery history.
 - `npm run ops -- recover <signal-id> --json` — policy-checked manual recovery; unsafe signals return `POLICY_BLOCKED`.
 - `npm run operational:launch-agent -- install|load|status` — manage the native watcher.
-- `npm run today:diagnostics -- --trace` — read-only V4.6 admission/refill trace from the Registry.
+- `npm run pipeline:diagnostics -- --trace` — read-only V4.7 strong-admission trace from the Registry.
+- `npm run today:diagnostics -- --trace` — read-only V4.7 top-Pipeline and Human-carryover trace.
 
 Safe recovery is limited to canonical LaunchAgent restart, verified stale-lock removal, idempotent command resumption, expired enrichment lease requeue, orphaned internal-run closure, projection-only Sheet retry, pending notification drain, and temporary per-run source degradation.
 
@@ -23,4 +24,4 @@ Runbooks:
 3. `GATEWAY_UNHEALTHY`: inspect Cloud Run and logs; V3E does not deploy or roll back cloud infrastructure.
 4. `OPERATIONAL_WATCH_FAILURE`: inspect `logs/operational-watch/` and `launchctl print gui/$UID/com.careerops.operational-watch`.
 5. Repeated/flapping failures: automatic attempts stop after two; the signal remains escalated with immutable event history.
-6. `TODAY_REFILL_BLOCKED`, `TODAY_ADMISSIBLE_NOT_PROJECTED`, `TODAY_STATE_CONTRADICTION`, or `TODAY_RANK_INVARIANT_FAILED`: inspect canonical state and run bounded reconciliation; never fill the slot with a lower-quality fallback. Legitimate `TODAY_UNDER_TARGET_EXHAUSTED` emits no signal and health remains healthy.
+6. `PIPELINE_ADMISSIBLE_NOT_PROJECTED`, `PIPELINE_RANK_INVARIANT_FAILED`, `PIPELINE_DUPLICATE_ACTIVE`, `PIPELINE_TERMINAL_PRESENT`, `PIPELINE_POLICY_CONTRADICTION`, or the corresponding TODAY invariant: inspect canonical state and run bounded reconciliation; never fill a slot from weak Registry entries. A legitimately small Pipeline and its resulting TODAY underfill emit no signal and remain healthy.

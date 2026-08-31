@@ -47,7 +47,7 @@ test('integrated acceptance traverses selection, eligibility, ranking, evaluatio
   const registry = new JobRegistry({ dbPath: ':memory:', clock });
   try {
     registry.startRun({ id: 'v1-acceptance', startedAt: NOW });
-    const description = `Required qualifications:\n- RAG\n- Python\n- Experience building AI systems\n${'Build production retrieval, orchestration, APIs, monitoring, and data pipelines for global customers. '.repeat(5)}`;
+    const description = `Required qualifications:\n- RAG\n- Python\n- Experience building AI systems\n- Flexible hours for a distributed team\n${'Build production retrieval, orchestration, APIs, monitoring, and data pipelines for global customers. '.repeat(5)}`;
     const observed = registry.recordObservation('v1-acceptance', {
       provider: 'fixture', externalId: 'acceptance-ai-1', sourceUrl: 'https://jobs.example.test/acceptance-ai-1',
       canonicalUrl: 'https://jobs.example.test/acceptance-ai-1', title: 'Senior AI Systems Engineer',

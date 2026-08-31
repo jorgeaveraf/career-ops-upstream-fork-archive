@@ -65,7 +65,7 @@ export function buildReadmeValues() {
   const rows = Array.from({ length: 122 }, () => Array(8).fill(''));
   const put = (row, column, value) => { rows[row - 1][column - 1] = value; };
   put(1, 1, 'Career Ops');
-  put(2, 1, 'Guía del operador V4.5 · cierre de aplicaciones + hoja estable sin parpadeo');
+  put(2, 1, 'Guía del operador V4.7 · Pipeline fuerte + ranking único + hoja estable');
 
   put(4, 1, 'ASÍ OPERAS CAREER OPS');
   put(5, 1, 'CAREER OPS TRABAJA SOLO. Tu única bandeja diaria es TODAY.');
@@ -96,8 +96,8 @@ export function buildReadmeValues() {
   put(27, 1, 'TU RUTINA DIARIA');
   const routine = [
     ['1 · RECIBE AVISO', 'Career Ops te avisa sólo cuando hay resultado o intervención útil.'],
-    ['2 · ABRE TODAY', 'Es tu única bandeja diaria. Rank 1 es la mejor acción u oportunidad actual.'],
-    ['3 · TRABAJA POR RANK', 'Avanza de Rank 1 hacia abajo; no uses PIPELINE como inbox alterno.'],
+    ['2 · ABRE TODAY', 'Es tu única bandeja diaria. Los ranks normales son exactamente los ranks de PIPELINE; HUMAN_CARRYOVER conserva trabajo gobernado.'],
+    ['3 · TRABAJA POR RANK', 'Avanza por Pipeline Rank; resuelve también cualquier HUMAN_CARRYOVER. PIPELINE no es un inbox alterno.'],
     ['4 · REVISA', 'Revisa paquete, ruta oficial, mejor contacto, mensaje y timing.'],
     ['5 · EDITA AMARILLO', 'Completa únicamente las decisiones o respuestas humanas activas.'],
     ['6 · SYNC JOBS', 'Career Ops valida e importa tus cambios de forma idempotente.'],
@@ -189,8 +189,8 @@ export function buildReadmeValues() {
   put(105, 1, 'GUÍA DE PESTAÑAS');
   put(106, 1, 'PESTAÑA'); put(106, 2, 'PARA QUÉ SIRVE'); put(106, 5, 'PESTAÑA'); put(106, 6, 'PARA QUÉ SIRVE');
   const tabPairs = [
-    [['README','Esta guía.'],['TODAY','Única bandeja diaria: cola curada, Rank y aprobaciones.']],
-    [['PIPELINE','Inventario activo amplio; no es inbox.'],['RESEARCH','Evidencia pendiente del sistema.']],
+    [['README','Esta guía.'],['TODAY','Top 10 de PIPELINE + carryovers humanos gobernados.']],
+    [['PIPELINE','Todas las oportunidades fuertes que Career Ops considera dignas de perseguir.'],['RESEARCH','Evidencia/evaluación todavía incompleta.']],
     [['APPLICATIONS','Aplicaciones confirmadas + outreach status + follow-up + outcomes.'],['CONTACTS','Contact Intelligence verificada + provenance + outreach status.']],
     [['FOLLOW_UPS','Follow-up recomendado/agendado y trabajo humano.'],['COMMUNITIES','WANT_TO_JOIN autoriza un join exacto; JOINED confirma membresía. Sync Communities nunca responde preguntas: SKIP/REJECT suprime sin borrar historial.']],
     [['SETTINGS','Incluye Candidate Gmail / LinkedIn Outreach readiness.'],['SOURCE_METRICS','Telemetría; no es de uso diario.']],
@@ -221,7 +221,7 @@ export function buildTabOrderRequests(sheets) {
 function columnWidths(name, columns) {
   const exact = {
     TODAY: { Lane:130, Company:150, Role:240, Stage:110, Status:145, Action:180, 'Handoff Type':175, 'Handoff Instruction':300, 'Open Application':150, 'Question Bundle':320, 'Application Progress':180, Recommendation:145, Rank:70, Location:145, 'Workflow Stage':105, 'Workflow Status':145, 'Last Activity':250, 'Last Updated':135, 'Attention Type':185, 'Attention Priority':105, Reason:260, Question:230, 'Allowed Actions':245, 'Recommended Action':260, 'Human Decision':145, 'Rejection Reason':170, 'Application Decision':155, 'Human Answer':260, 'Human Resolution':185, 'Resolution Notes':230, 'Follow-Up Date':125, 'Follow-Up Action':210, Notes:210, Outcome:145, Evaluation:170, 'Key Fit Reasons':260, 'Meaningful Gaps':250, 'Application Path':145, 'Package Version':105, Resume:245, 'Cover Letter':270, Contacts:170, 'Job URL':130, Movement:72, Eligibility:100, 'Final Priority':92, 'Evidence Confidence':112, 'Missing Evidence':200, 'Why This Role':250, 'Last Command':125, 'Command Status':125, 'Command Result':230, 'Attention Status':145, 'Enrichment Summary':280, 'Last Enriched':145, 'Human Blocker':200, 'Lifecycle State':145, 'Decision Outcome':145, 'Enrichment Status':140, 'Execution Status':145 },
-    PIPELINE: { State: 95, 'Current Rank': 88, Company: 150, Role: 230, Eligibility: 100, 'Selection Score': 100, 'Final Priority': 92, 'Attention Status': 145, 'Evidence Confidence': 112, 'Research Needs': 250, Freshness: 76, Source: 125, 'Human Decision': 150, 'Rejection Reason': 170, 'Decision Outcome': 145, 'Enrichment Status': 135, 'Last Updated': 155, 'Job URL': 130 },
+    PIPELINE: { 'Pipeline Rank': 88, Company: 150, Role: 230, Recommendation: 145, 'Candidate Fit': 105, 'Opportunity Quality': 125, 'Evidence Confidence': 112, Location: 145, 'Employment Model': 125, State: 95, 'Final Priority': 92, 'Why This Role': 270, Freshness: 76, Source: 125, 'Human Decision': 150, 'Rejection Reason': 170, 'Decision Outcome': 145, 'Enrichment Status': 135, 'Last Updated': 155, 'Job URL': 130 },
     RESEARCH: { 'Research Priority': 112, Company: 150, Role: 230, 'Current Rank': 88, Eligibility: 100, 'Potential Value': 100, Needs: 270, 'Primary Blocker': 180, Status: 90, 'Last Research': 145, 'Job URL': 130, 'Human Notes': 240 },
     COMMUNITIES: { Recommendation:125, Community:220, 'Workflow Stage':110, 'Workflow Status':165, 'Last Activity':280, 'Last Updated':135, Topic:140, Visibility:90, Members:95, Activity:90, 'Opportunity Signal':120, Spam:80, Quality:80, 'Membership State':145, 'Monitoring Readiness':165, 'Monitoring Status':150, 'Posts Seen':95, 'Opportunities Found':130, 'Why It Matters':300, 'Group URL':150, 'Membership Decision':155, Notes:240, 'Last Checked':145 },
     APPLICATIONS: { Company: 150, Role: 230, 'Applied Date': 145, 'Application Channel': 130, Confirmation: 220, 'Application Status': 145, 'Interview Date': 130, 'Next Action': 220, Outcome: 130, Contacts: 120, 'Job URL': 130, Notes: 240 },
@@ -307,10 +307,10 @@ export function buildManagedTabFormatRequests(sheet) {
     zone('Movement','Why This Role','#4D6173');
   }
 
-  const compactFields = ['Workflow Stage', 'Workflow Status', 'Attention Priority', 'Command Status', 'Rank', 'Movement', 'Current Rank', 'Research Priority', 'Evidence Confidence', 'Attention Status', 'State', 'Status', 'Package Status'];
+  const compactFields = ['Workflow Stage', 'Workflow Status', 'Attention Priority', 'Command Status', 'Rank', 'Movement', 'Current Rank', 'Pipeline Rank', 'Candidate Fit', 'Opportunity Quality', 'Research Priority', 'Evidence Confidence', 'Attention Status', 'State', 'Status', 'Package Status'];
   for (const field of compactFields) {
     const column = contract.columns.indexOf(field);
-    if (column >= 0) requests.push({ repeatCell: { range: grid(sheetId, dataStart, endRow, column, column + 1), cell: { userEnteredFormat: { horizontalAlignment: 'CENTER', textFormat: { bold: ['Rank', 'Current Rank', 'Attention Status'].includes(field) } } }, fields: 'userEnteredFormat(horizontalAlignment,textFormat.bold)' } });
+    if (column >= 0) requests.push({ repeatCell: { range: grid(sheetId, dataStart, endRow, column, column + 1), cell: { userEnteredFormat: { horizontalAlignment: 'CENTER', textFormat: { bold: ['Rank', 'Current Rank', 'Pipeline Rank', 'Attention Status'].includes(field) } } }, fields: 'userEnteredFormat(horizontalAlignment,textFormat.bold)' } });
   }
   for (const field of contract.columns.filter(column => column.includes('URL'))) {
     const column = contract.columns.indexOf(field);
@@ -350,8 +350,8 @@ export function buildManagedTabFormatRequests(sheet) {
     addRule(requests, booleanRule([attentionTypeRange], 'TEXT_EQ', 'FOLLOW_UP_REQUIRED', '#F1ECF8', {bold:true,foreground:'#5B3A82'}), ruleIndex++);
     addRule(requests, booleanRule([attentionTypeRange], 'TEXT_EQ', 'EXTERNAL_ACTION_REQUIRED', '#FDECEC', {bold:true,foreground:'#8C1D18'}), ruleIndex++);
     const lane=contract.columns.indexOf('Lane'),laneRange=grid(sheetId,dataStart,endRow,lane,lane+1);
-    addRule(requests, booleanRule([laneRange], 'TEXT_EQ', 'ATTENTION', '#FDECEC', {bold:true,foreground:'#8C1D18'}), ruleIndex++);
-    addRule(requests, booleanRule([laneRange], 'TEXT_EQ', 'CURATED', '#E8F0FE', {bold:true,foreground:'#174EA6'}), ruleIndex++);
+    addRule(requests, booleanRule([laneRange], 'TEXT_EQ', 'HUMAN_CARRYOVER', '#FCE8B2', {bold:true,foreground:'#7A4B00'}), ruleIndex++);
+    addRule(requests, booleanRule([laneRange], 'TEXT_EQ', 'CURATED_PIPELINE', '#E8F0FE', {bold:true,foreground:'#174EA6'}), ruleIndex++);
     const humanStatus=contract.columns.indexOf('Status'),humanStatusRange=grid(sheetId,dataStart,endRow,humanStatus,humanStatus+1);
     addRule(requests, booleanRule([humanStatusRange], 'TEXT_EQ', 'WAITING_FOR_YOU', '#FCE8B2', {bold:true,foreground:'#7A4B00'}), ruleIndex++);
     addRule(requests, booleanRule([humanStatusRange], 'TEXT_EQ', 'WORKING', '#E8F0FE', {bold:true,foreground:'#174EA6'}), ruleIndex++);
@@ -405,14 +405,11 @@ export function buildManagedTabFormatRequests(sheet) {
     }
   }
   if (name === 'PIPELINE') {
-    const status = contract.columns.indexOf('Attention Status');
-    const statusRange = grid(sheetId, 1, endRow, status, status + 1);
-    addRule(requests, booleanRule([statusRange], 'TEXT_EQ', 'ACTION_READY', '#E3F2E6', { bold: true, foreground: '#175C2C' }), ruleIndex++);
-    addRule(requests, booleanRule([statusRange], 'TEXT_EQ', 'REVIEW_REQUIRED', '#FCE8B2', { bold: true, foreground: '#7A4B00' }), ruleIndex++);
-    addRule(requests, booleanRule([statusRange], 'TEXT_EQ', 'RESEARCH_REQUIRED', '#EEF2F5', { foreground: '#4D6173' }), ruleIndex++);
+    const recommendation = contract.columns.indexOf('Recommendation');
+    addRule(requests, booleanRule([grid(sheetId, 1, endRow, recommendation, recommendation + 1)], 'TEXT_STARTS_WITH', 'APPLY', '#D9EFD9', { bold: true, foreground: '#175C2C' }), ruleIndex++);
     const state = contract.columns.indexOf('State');
     addRule(requests, booleanRule([grid(sheetId, 1, endRow, state, state + 1)], 'TEXT_EQ', 'ACTIVE', '#E8F0FE', { bold: true, foreground: '#174EA6' }), ruleIndex++);
-    addRule(requests, booleanRule([grid(sheetId, 1, endRow, state, state + 1)], 'TEXT_EQ', 'CARRYOVER', '#F1F3F4', { foreground: '#5F6368' }), ruleIndex++);
+    addRule(requests, booleanRule([grid(sheetId, 1, endRow, state, state + 1)], 'TEXT_EQ', 'HOLD', '#F1F3F4', { foreground: '#5F6368' }), ruleIndex++);
   }
   if (['TODAY', 'PIPELINE'].includes(name)) {
     const outcome = contract.columns.indexOf('Decision Outcome');
@@ -447,7 +444,8 @@ export function buildManagedTabFormatRequests(sheet) {
 
   const idIndex = contract.columns.indexOf('Entity ID');
   requests.push({ updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: idIndex >= 0 ? idIndex : width }, properties: { hiddenByUser: false }, fields: 'hiddenByUser' } });
-  if(name==='TODAY')for(const field of ['Lane','Final Priority','Workflow Stage','Workflow Status','Last Command','Command Status','Command Result','Attention Status','Enrichment Summary','Last Enriched','Human Blocker','Lifecycle State','Decision Outcome','Enrichment Status','Execution Status','Entity Type','Job ID','Question ID']){const column=contract.columns.indexOf(field);requests.push({updateDimensionProperties:{range:{sheetId,dimension:'COLUMNS',startIndex:column,endIndex:column+1},properties:{hiddenByUser:true},fields:'hiddenByUser'}});}
+  if(name==='TODAY')for(const field of ['Final Priority','Workflow Stage','Workflow Status','Last Command','Command Status','Command Result','Attention Status','Enrichment Summary','Last Enriched','Human Blocker','Lifecycle State','Decision Outcome','Enrichment Status','Execution Status','Entity Type','Job ID','Question ID']){const column=contract.columns.indexOf(field);requests.push({updateDimensionProperties:{range:{sheetId,dimension:'COLUMNS',startIndex:column,endIndex:column+1},properties:{hiddenByUser:true},fields:'hiddenByUser'}});}
+  if(name==='PIPELINE')for(const field of ['Admission Reason','Policy Version']){const column=contract.columns.indexOf(field);requests.push({updateDimensionProperties:{range:{sheetId,dimension:'COLUMNS',startIndex:column,endIndex:column+1},properties:{hiddenByUser:true},fields:'hiddenByUser'}});}
   if (idIndex >= 0) requests.push({ updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: idIndex, endIndex: width }, properties: { hiddenByUser: true }, fields: 'hiddenByUser' } });
   return requests;
 }
